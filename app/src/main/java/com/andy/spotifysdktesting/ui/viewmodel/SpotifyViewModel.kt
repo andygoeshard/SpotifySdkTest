@@ -22,7 +22,10 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
     private val _currentTrack = MutableStateFlow<CurrentTrack?>(null)
     val currentTrack: StateFlow<CurrentTrack?> = _currentTrack
 
-    fun connectToSpotify(clientId: String, redirectUri: String) {
+    private val clientId: String = "YOUR_CLIENT_ID"
+    private val redirectUri: String = "YOUR_REDIRECT_URI"
+
+    fun connectToSpotify() {
         viewModelScope.launch {
                 spotifyManager.connect(clientId, redirectUri).collect { connected ->
                     _isConnected.value = connected

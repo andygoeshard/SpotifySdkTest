@@ -60,10 +60,7 @@ fun SpotifyScreen(viewModel: SpotifyViewModel) {
     val context = LocalContext.current
 
     IconButton(onClick = {
-        viewModel.connectToSpotify(
-            clientId = "46a0dac409094379b9cee858b45d254a",
-            redirectUri = "com.andy.spotifysdktesting://callback"
-        )
+        viewModel.connectToSpotify()
     }) {
         Icon(
             painter = painterResource(id = R.drawable.baseline_music_note_24),
