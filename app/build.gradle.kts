@@ -1,16 +1,21 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.jetbrainsKotlinSerialization)
+    alias(libs.plugins.secrets)
+    alias(libs.plugins.jetbrains.kotlin.compose)
 }
+
+
 
 android {
     namespace = "com.andy.spotifysdktesting"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.andy.spotifysdktesting"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -18,6 +23,29 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField(
+            "String",
+            "COQUI_API_KEY",
+            "\"${project.findProperty("COQUI_API_KEY")}\""
+        )
+
+        buildConfigField(
+            "String",
+            "ELEVEN_API_KEY",
+            "\"${project.findProperty("ELEVEN_API_KEY")}\""
+        )
+
+        buildConfigField(
+            "String",
+            "CLIENT_ID",
+            "\"${project.findProperty("CLIENT_ID")}\""
+        )
+
+        buildConfigField(
+            "String",
+            "REDIRECT_URI",
+            "\"${project.findProperty("REDIRECT_URI")}\""
+        )
     }
 
     buildTypes {
@@ -37,16 +65,23 @@ android {
         jvmTarget = "1.8"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+
+}
+
+secrets {
+    defaultPropertiesFileName = "local.defaults.properties"
 }
 
 dependencies {
@@ -63,6 +98,19 @@ dependencies {
     implementation(files("../gson-2.11.0.jar"))
     implementation(libs.androidx.appcompat)
     implementation(libs.coil.compose)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.json)
+    implementation(libs.google.ai.client)
+    implementation(libs.okhttp)
+    implementation(libs.koin.android)
+    implementation(libs.koin.compose)
+    implementation(libs.koin.core)
+    implementation(libs.koin.compose.viewmodel)
+    implementation(libs.androidx.compose.ui)
+
+    implementation(libs.bundles.ktor.client)
+
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -71,4 +119,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+
 }

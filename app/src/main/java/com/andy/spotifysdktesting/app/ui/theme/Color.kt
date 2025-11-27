@@ -1,4 +1,4 @@
-package com.andy.spotifysdktesting.ui.theme
+package com.andy.spotifysdktesting.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,10 +1,8 @@
-package com.andy.spotifysdktesting.service
+package com.andy.spotifysdktesting.feature.spotifysdk.domain.service
 
-import android.app.ActivityManager
 import android.content.Context
-import android.content.Intent
 import android.util.Log
-import com.andy.spotifysdktesting.data.CurrentTrack
+import com.andy.spotifysdktesting.feature.spotifysdk.data.CurrentTrack
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
 import com.spotify.android.appremote.api.SpotifyAppRemote

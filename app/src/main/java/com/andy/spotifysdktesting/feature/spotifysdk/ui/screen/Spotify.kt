@@ -1,4 +1,4 @@
-package com.andy.spotifysdktesting.ui.screen
+package com.andy.spotifysdktesting.feature.spotifysdk.ui.screen
 
 import android.widget.Toast
 import androidx.compose.animation.core.Animatable
@@ -48,16 +48,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.andy.spotifysdktesting.R
-import com.andy.spotifysdktesting.data.CurrentTrack
-import com.andy.spotifysdktesting.ui.viewmodel.SpotifyViewModel
+import com.andy.spotifysdktesting.feature.spotifysdk.data.CurrentTrack
+import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
+import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun SpotifyScreen(viewModel: SpotifyViewModel) {
+fun SpotifyScreen(viewModel: SpotifyViewModel =  koinViewModel()) {
 
     var showDialog by remember { mutableStateOf(false) }
     val isConnected by viewModel.isConnected.collectAsState()
     val trackInfo by viewModel.currentTrack.collectAsState()
-    val context = LocalContext.current
 
     IconButton(onClick = {
         viewModel.connectToSpotify()

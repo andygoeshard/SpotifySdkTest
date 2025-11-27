@@ -1,15 +1,30 @@
 [versions]
-agp = "8.4.1"
-kotlin = "1.9.0"
-coreKtx = "1.13.1"
+agp = "8.13.1"
+kotlin = "2.2.21"
+coreKtx = "1.17.0"
 junit = "4.13.2"
-junitVersion = "1.1.5"
-espressoCore = "3.5.1"
-lifecycleRuntimeKtx = "2.7.0"
-activityCompose = "1.9.0"
-composeBom = "2023.08.00"
-appcompat = "1.7.0"
-coil = "2.6.0"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx ="2.10.0"
+activityCompose = "1.12.0"
+composeBom = "2024.12.01"
+appcompat = "1.7.1"
+coil = "2.7.0"
+kotlinComposeCompiler = "2.2.21"   # ejemplo: la última estable con Kotlin 2.x
+
+
+pluginserialization = "2.2.21"
+coqui-tts = "1.0.0"
+google-ai = "0.9.0"
+retrofit = "3.0.0"
+okhttp = "5.3.2"
+kotlinx-serialization-json = "1.9.0"
+koin = "4.1.1"
+ui = "1.9.5"
+secrets = "2.0.1"
+ktor = "3.1.2"
+
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -29,7 +44,36 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil"}
 
+#google_ai
+google-ai-client = { group = "com.google.ai.client.generativeai", name = "generativeai", version.ref = "google-ai" }
+#apis
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-converter-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+#koin
+koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin" }
+koin-core = { module = "io.insert-koin:koin-core" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin"}
+koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin"}
+koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin"}
+
+#ktor
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
+
+[bundles]
+ktor-client = ["ktor-client-core", "ktor-client-android", "ktor-client-content-negotiation", "ktor-serialization-kotlinx-json"]
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+jetbrainsKotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "pluginserialization" }
+secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secrets" }
+jetbrains-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinComposeCompiler" }
 
