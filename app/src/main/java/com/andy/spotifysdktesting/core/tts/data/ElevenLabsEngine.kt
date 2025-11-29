@@ -1,22 +1,22 @@
 package com.andy.spotifysdktesting.core.tts.data
 
-import android.util.Log
 import com.andy.spotifysdktesting.core.tts.domain.TtsEngine
 import com.andy.spotifysdktesting.core.tts.domain.TtsResult
 import com.andy.spotifysdktesting.core.tts.domain.TtsVoice
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.accept
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.core.readBytes
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.system.measureTimeMillis
 
 class ElevenLabsEngine(
     private val client: HttpClient,
@@ -38,27 +38,30 @@ class ElevenLabsEngine(
     )
 
     override suspend fun synthesize(text: String, voice: TtsVoice): TtsResult {
+        val url =
+            "https://api.elevenlabs.io/v1/text-to-speech/${voice.id}/stream?output_format=opus_48000_128"
+
+        val requestBody = ElevenRequest(text)
+
         return try {
+            var audioBytes: ByteArray? = null
 
-            val url =
-                "https://api.elevenlabs.io/v1/text-to-speech/${voice.id}?output_format=mp3_44100_128"
+            val duration = measureTimeMillis {
+                val response: HttpResponse = client.post(url) {
+                    header("xi-api-key", apiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(requestBody)
+                }
 
-            val requestBody = ElevenRequest(text)
+                if (!response.status.isSuccess()) {
+                    return TtsResult.Error("HTTP ${response.status}: ${response.bodyAsText()}")
+                }
 
-            val response: HttpResponse = client.post(url) {
-                header("xi-api-key", apiKey)
-                contentType(ContentType.Application.Json)
-                accept(ContentType.Audio.MPEG)
-                setBody(requestBody)
+                val channel = response.bodyAsChannel()
+                audioBytes = channel.readRemaining().readBytes()
             }
 
-            if (!response.status.isSuccess()) {
-                val errorText = response.bodyAsText()
-                Log.e("ElevenLabsEngine", "Error: ${response.status} - $errorText")
-                return TtsResult.Error("HTTP ${response.status}: $errorText")
-            }
-
-            val bytes: ByteArray = response.body()
+            val bytes = audioBytes ?: return TtsResult.Error("No audio generated")
 
             if (bytes.isEmpty()) {
                 return TtsResult.Error("Empty audio")
@@ -67,7 +70,6 @@ class ElevenLabsEngine(
             TtsResult.Success(bytes)
 
         } catch (e: Exception) {
-            Log.e("ElevenLabsEngine", "Exception", e)
             TtsResult.Error("Ktor ElevenLabs error", e)
         }
     }

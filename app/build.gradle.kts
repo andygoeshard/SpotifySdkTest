@@ -6,8 +6,6 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.compose)
 }
 
-
-
 android {
     namespace = "com.andy.spotifysdktesting"
     compileSdk = 36
@@ -45,6 +43,12 @@ android {
             "String",
             "REDIRECT_URI",
             "\"${project.findProperty("REDIRECT_URI")}\""
+        )
+
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"${project.findProperty("GEMINI_API_KEY")}\""
         )
     }
 
@@ -110,6 +114,15 @@ dependencies {
 
     implementation(libs.bundles.ktor.client)
 
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.common)
+    implementation(libs.media3.ui)
+    implementation(libs.androidx.browser)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.datastore.preferences)
+    implementation(libs.datastore.core)
+
+
 
 
     testImplementation(libs.junit)
@@ -119,6 +132,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-
 }

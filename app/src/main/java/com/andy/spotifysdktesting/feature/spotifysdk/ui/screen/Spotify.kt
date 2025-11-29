@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.andy.spotifysdktesting.R
-import com.andy.spotifysdktesting.feature.spotifysdk.data.CurrentTrack
+import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.CurrentTrack
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
 import org.koin.compose.viewmodel.koinViewModel
 

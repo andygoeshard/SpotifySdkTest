@@ -1,4 +1,4 @@
-package com.andy.spotifysdktesting.feature.spotifysdk.data
+package com.andy.spotifysdktesting.feature.spotifysdk.domain.model
 
 data class CurrentTrack(
     val trackName: String,

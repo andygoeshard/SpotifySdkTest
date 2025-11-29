@@ -11,10 +11,8 @@ import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewMod
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.http.ContentType.Application.Json
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import org.koin.core.module.dsl.viewModel
@@ -40,6 +38,8 @@ val koinModule = module {
                 connectTimeoutMillis = 15_000
                 socketTimeoutMillis = 25_000
             }
+
+            expectSuccess = false
         }
     }
 
@@ -68,8 +68,6 @@ val koinModule = module {
 
     // AudioPlayer (si tiene dependencias, las agregás)
     single { AudioPlayer(androidContext()) }
-
-    viewModel { SpotifyViewModel(get()) }
     viewModel { DjViewModel(
         get(),
         audioPlayer = get()

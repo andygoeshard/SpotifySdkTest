@@ -3,8 +3,9 @@ package com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.andy.spotifysdktesting.feature.spotifysdk.data.CurrentTrack
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.service.SpotifyManager
+import com.andy.spotifysdktesting.BuildConfig
+import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.CurrentTrack
+import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,19 +21,28 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
     val currentTrack: StateFlow<CurrentTrack?> = _currentTrack
 
     private var trackJob: Job? = null
-
-
-    private val clientId: String = "tu_client_id_real"
-    private val redirectUri: String = "myapp://callback"
+    private var connectionJob: Job? = null
+    private val clientId: String = BuildConfig.SPOTIFY_CLIENT_ID
+    private val redirectUri: String = BuildConfig.SPOTIFY_REDIRECT_URI
 
     fun connectToSpotify() {
-        viewModelScope.launch {
-                spotifyManager.connect(clientId, redirectUri).collect { connected ->
-                    _isConnected.value = connected
-                    return@collect
-            }
+        connectionJob?.cancel()
+
+        connectionJob = viewModelScope.launch {
+            // El Flow se mantiene activo y emitirá el estado de la conexión.
             spotifyManager.connect(clientId, redirectUri).collect { connected ->
-                _isConnected.value = connected
+                if (connected) {
+                    observeCurrentTrack()
+                    println("🔌 CONECTADO A SPOTIFY SDK :D")
+                    _isConnected.value = true
+                } else {
+                    // Si falla, cancelamos la observación de track.
+                    trackJob?.cancel()
+                    _isConnected.value = false
+                    _currentTrack.value = null
+                    println("🔌 NO CONECTADO A SPOTIFY SDK… retry")
+
+                }
             }
         }
     }
@@ -58,5 +68,11 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
 
         _isConnected.value = false
         _currentTrack.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        connectionJob?.cancel() // Asegurar la limpieza del Job de conexión
+        disconnectFromSpotify()
     }
 }
