@@ -11,4 +11,6 @@ interface SpotifyRepository {
         seedArtists: List<String>,
         seedGenres: List<String>
     ): List<Track>
+    suspend fun getTopTracks(limit: Int = 20, timeRange: String = "medium_term"): List<Track>
+    suspend fun getRecentlyPlayed(limit: Int = 5): List<Track>
 }

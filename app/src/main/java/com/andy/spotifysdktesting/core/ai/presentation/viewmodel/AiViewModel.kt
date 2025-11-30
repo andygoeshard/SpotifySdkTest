@@ -1,9 +1,8 @@
 package com.andy.spotifysdktesting.core.ai.presentation.viewmodel
 
-import android.util.Log.v
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.util.Log
 import com.andy.spotifysdktesting.core.ai.domain.AiMusicBrain
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyTokenManager
@@ -155,7 +154,10 @@ class AiViewModel(
             // 3. Actualizar el estado para la UI/Chat
             _uiState.value = _uiState.value.copy(
                 loading = false,
-                chatResponse = reason // Puedes usar aiReason o chatResponse, elije uno
+                aiSong = currentTrack.trackName,
+                aiReason = reason,
+                aiRaw = rawResponse,
+                chatResponse = ""
             )
 
             return reason // ✅ Retorna la razón

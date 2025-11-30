@@ -104,7 +104,7 @@ class HomeViewModel(
         // 1. Pedir a la IA la canción (solo sugerencia)
         ai.startAi("cambiame el mood, rompeme la caja")
         // 2. Opcional: Si quieres que hable INMEDIATAMENTE después de la sugerencia:
-        triggerDjSequence(isImmediateSuggestion = true)
+        triggerDjSequence(isImmediateSuggestion = false)
     }
 
     private fun observeCurrentTrackChanges() {
@@ -163,8 +163,6 @@ class HomeViewModel(
             return@launch
         }
 
-        // A. Pausar la música
-        spotify.pause()
 
         // B. Narrar la razón
         println("🎤 DJ Narrando: $reason")
@@ -172,8 +170,6 @@ class HomeViewModel(
         tts.onEvent(TtsEvent.SpeakText(reason))
         tts.awaitSpeakCompletion()
 
-        // C. Reanudar la reproducción
-        spotify.resume()
     }
 
     private fun djExplainCurrentSong() {
