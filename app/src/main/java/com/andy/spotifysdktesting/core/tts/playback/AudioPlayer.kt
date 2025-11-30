@@ -16,15 +16,12 @@ class AudioPlayer(
     fun play(audio: ByteArray, onFinish: (() -> Unit)? = null) {
         stop()
 
-        // Archivo temporal (sirve para mp3, wav, opus, etc.)
         val file = File(context.cacheDir, "tts_${System.currentTimeMillis()}.tmp")
         file.writeBytes(audio)
 
-        // Crea nuevo player
         val exo = ExoPlayer.Builder(context).build()
         player = exo
 
-        // Detecta tipo MIME según extensión (si querés lo puedo mejorar)
         val mime = when {
             file.name.endsWith(".wav") -> MimeTypes.AUDIO_WAV
             file.name.endsWith(".ogg") -> MimeTypes.AUDIO_OGG

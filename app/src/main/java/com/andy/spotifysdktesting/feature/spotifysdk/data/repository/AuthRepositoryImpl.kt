@@ -24,39 +24,30 @@ class AuthRepositoryImpl(
     private val pkce: PKCEManager,
     private val clientId: String,
     private val redirectUri: String,
-    private val client: HttpClient,
+    private val client: HttpClient, // ⚠️ AQUÍ DEBE LLEGAR EL CLIENTE "AuthClient" (SIN TOKEN)
     private val tokenManager: SpotifyTokenManager
 ) : AuthRepository {
 
-    // CAMBIO: Ahora retorna solo String (la URL)
     override suspend fun startLogin(): String {
         val verifier = pkce.generateCodeVerifier()
         val challenge = pkce.generateCodeChallenge(verifier)
 
-        // IMPORTANTE: Guardamos el verifier en disco (DataStore)
         tokenManager.saveVerifier(verifier)
 
-        val authUrl = "https://accounts.spotify.com/authorize?" +
+        return "https://accounts.spotify.com/authorize?" +
                 "client_id=$clientId" +
                 "&response_type=code" +
                 "&redirect_uri=$redirectUri" +
                 "&code_challenge=$challenge" +
                 "&code_challenge_method=S256" +
                 "&scope=user-read-private%20user-read-email%20streaming%20user-read-playback-state%20user-modify-playback-state"
-
-        return authUrl
     }
 
-    // CAMBIO: Ya no recibe verifier como parámetro
-    override suspend fun exchangeCodeForToken(
-        code: String
-    ): Boolean = withContext(Dispatchers.IO) {
-
-        // RECUPERAR: Leemos el verifier de DataStore
+    override suspend fun exchangeCodeForToken(code: String): Boolean = withContext(Dispatchers.IO) {
         val verifier = tokenManager.getVerifier()
 
         if (verifier.isNullOrEmpty()) {
-            println("ERROR: Verifier no encontrado. Posible reinicio de proceso.")
+            println("ERROR: Verifier no encontrado.")
             return@withContext false
         }
 
@@ -68,12 +59,15 @@ class AuthRepositoryImpl(
             append("code_verifier", verifier)
         }
 
+        // ⚠️ Asegúrate de que esta URL sea la correcta de Spotify Accounts
         val response: HttpResponse = client.post("https://accounts.spotify.com/api/token") {
             setBody(FormDataContent(form))
-            header("Content-Type", "application/x-www-form-urlencoded")
         }
 
-        if (!response.status.isSuccess()) return@withContext false
+        if (!response.status.isSuccess()) {
+            println("ERROR en exchangeCodeForToken: ${response.status}")
+            return@withContext false
+        }
 
         val body: TokenResponse = response.body()
 
@@ -83,9 +77,7 @@ class AuthRepositoryImpl(
             expiresInSeconds = body.expiresIn
         )
 
-        // Limpiamos el verifier usado
         tokenManager.clearVerifier()
-
         return@withContext true
     }
 
@@ -119,5 +111,4 @@ class AuthRepositoryImpl(
     override suspend fun getCurrentAccessToken(): String? {
         return tokenManager.getAccessToken()
     }
-
 }

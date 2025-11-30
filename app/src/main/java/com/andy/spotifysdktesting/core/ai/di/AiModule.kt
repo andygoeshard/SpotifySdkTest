@@ -10,5 +10,5 @@ import org.koin.dsl.module
 val aiModule = module {
     single { GeminiClientProvider(apiKey = BuildConfig.GEMINI_API_KEY) }
     single { AiMusicBrain(get(), get()) }
-    viewModel { AiViewModel(get(),get()) }
+    viewModel { AiViewModel(get(),get(),get(),get()) }
 }

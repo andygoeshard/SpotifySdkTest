@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -48,154 +49,104 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.andy.spotifysdktesting.R
+import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModel
+import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModelIntent
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.CurrentTrack
+import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthState
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
-fun SpotifyScreen(viewModel: SpotifyViewModel =  koinViewModel()) {
+fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
 
-    var showDialog by remember { mutableStateOf(false) }
-    val isConnected by viewModel.isConnected.collectAsState()
-    val trackInfo by viewModel.currentTrack.collectAsState()
+    val state by vm.state.collectAsState()
+    val spotifyState = state.spotifyState
+    val trackInfo = spotifyState.currentTrack
 
-    IconButton(onClick = {
-        viewModel.connectToSpotify()
-    }) {
-        Icon(
-            painter = painterResource(id = R.drawable.baseline_music_note_24),
-            contentDescription = "Music Icon",
-            tint = Color.White,
-            modifier = Modifier
-                .background(Color.Gray, shape = CircleShape)
-                .padding(10.dp)
-        )
+    // El componente SOLO aparece si estamos conectados Y hay una pista.
+    if (!spotifyState.isConnected || trackInfo == null) {
+        return
     }
 
-    LaunchedEffect(isConnected) {
-        if (isConnected) {
-            showDialog = true
-            viewModel.observeCurrentTrack()
-        }
-    }
+    val isPaused = trackInfo.isPaused
 
-    if (showDialog) {
-        if (trackInfo != null) {
-            MusicControlDialog(
-                onDismissRequest = {
-                    showDialog = false
-                    viewModel.disconnectFromSpotify()
-                },
-                currentTrack = trackInfo!!,
-                viewModel
+    // La barra de control en la parte inferior
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // 1. Imagen y Texto
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = trackInfo.imageUri,
+                contentDescription = "Track Image",
+                modifier = Modifier.size(40.dp)
             )
-        } else {
-            ToastError()
-            showDialog = false
-            viewModel.disconnectFromSpotify()
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = trackInfo.trackName,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = trackInfo.artistName,
+                    color = Color.LightGray,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
         }
-    }
 
-}
+        // 2. Controles (Play/Pause y Next)
+        Row {
+            // Botón Skip Previous
+            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnPreviousSong) }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.baseline_skip_previous_24),
+                    contentDescription = "Previous",
+                    tint = Color.White
+                )
+            }
 
-@Composable
-fun MusicControlDialog(
-    onDismissRequest: () -> Unit,
-    currentTrack: CurrentTrack,
-    viewModel: SpotifyViewModel
-) {
-    Dialog(onDismissRequest = onDismissRequest) {
-
-        var isPaused by remember { mutableStateOf(currentTrack.isPaused) }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .fillMaxHeight()
-                .fillMaxWidth()
-                .clickable { onDismissRequest() }
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .fillMaxHeight(0.35f)
-                    .align(Alignment.Center)
-                    .background(Color.Black, shape = MaterialTheme.shapes.medium)
-                    .clickable(false) {}
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.End,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Close",
-                            modifier = Modifier
-                                .clickable { onDismissRequest() }
-                                .padding(0.dp, 0.dp, 16.dp, 0.dp),
-                            tint = Color.White
-                        )
-                    }
-
-                    AnimTrackImage(currentTrack.imageUri, currentTrack.isPaused)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    TrackText(trackName = currentTrack.trackName)
-                    ArtistText(artistName = currentTrack.artistName)
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        IconButton(onClick = {
-                            viewModel.spotifyManager.previous()
-                            isPaused = false
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.baseline_skip_previous_24),
-                                contentDescription = "Previous",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(onClick = {
-                            isPaused = !isPaused
-                            if (isPaused) viewModel.spotifyManager.pause() else viewModel.spotifyManager.play()
-                        }) {
-                            Icon(
-                                painter = if (!isPaused) painterResource(id = R.drawable.baseline_pause_24) else painterResource(
-                                    id = R.drawable.baseline_play_arrow_24
-                                ),
-                                contentDescription = if (isPaused) "Pause" else "Play",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(onClick = {
-                            viewModel.spotifyManager.next()
-                            isPaused = false
-                        }) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.baseline_skip_next_24),
-                                contentDescription = "Next",
-                                tint = Color.White
-                            )
-                        }
-                    }
+            // Botón Play/Pause
+            IconButton(onClick = {
+                if (isPaused) {
+                    vm.processIntent(HomeViewModelIntent.OnPlay)
+                } else {
+                    vm.processIntent(HomeViewModelIntent.OnPause)
                 }
+            }) {
+                Icon(
+                    painter = if (isPaused) painterResource(id = R.drawable.baseline_play_arrow_24) else painterResource(
+                        id = R.drawable.baseline_pause_24
+                    ),
+                    contentDescription = if (isPaused) "Play" else "Pause",
+                    tint = Color.White
+                )
+            }
+
+            // Botón Skip Next
+            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnNextSong) }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.baseline_skip_next_24),
+                    contentDescription = "Next",
+                    tint = Color.White
+                )
             }
         }
     }
-
+}
+// Mantenemos las funciones auxiliares que no usan el Dialog
+@Composable
+fun ToastError() {
+    Toast.makeText(LocalContext.current, "Error connecting to Spotify", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
@@ -241,13 +192,6 @@ fun AnimTrackImage(imageUri: String?, isPaused: Boolean) {
             .width(100.dp)
             .rotate(currentRotation)
     )
-
-}
-
-@Composable
-fun ToastError() {
-
-    Toast.makeText(LocalContext.current, "Error connecting to Spotify", Toast.LENGTH_SHORT).show()
 
 }
 

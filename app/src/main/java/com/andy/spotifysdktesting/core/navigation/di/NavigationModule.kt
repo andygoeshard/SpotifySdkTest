@@ -7,7 +7,7 @@ val navigationModule = module {
     single { HomeViewModel(
         get(),
         ai = get(),
-        dj = get(),
+        tts = get(),
         auth = get()
     ) }
 }

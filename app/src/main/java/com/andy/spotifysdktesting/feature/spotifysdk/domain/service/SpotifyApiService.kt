@@ -1,23 +1,22 @@
 package com.andy.spotifysdktesting.feature.spotifysdk.domain.service
 
+import androidx.media3.common.util.Log
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 
+// ⚠️ SOLO RECIBE EL CLIENTE HTTP
 class SpotifyApiService(
-    private val client: HttpClient,
-    private val spotifyManager: SpotifyManager
+    private val client: HttpClient
 ) {
-    private suspend fun authHeader(builder: HttpRequestBuilder) {
-        val token = spotifyManager.accessToken ?: error("Spotify token null")
-        builder.header(HttpHeaders.Authorization, "Bearer $token")
-    }
+    // ELIMINAMOS authHeader, ya que Ktor Auth Plugin lo hace automáticamente
 
     suspend fun searchTracks(query: String): String {
+        Log.d("SpotifyApiService", "Buscando tracks con query: $query")
         return client.get("https://api.spotify.com/v1/search") {
-            authHeader(this)
+            // ELIMINAMOS authHeader(this)
             parameter("q", query)
             parameter("type", "track")
             parameter("limit", 20)
@@ -26,13 +25,13 @@ class SpotifyApiService(
 
     suspend fun getTrack(id: String): String {
         return client.get("https://api.spotify.com/v1/tracks/$id") {
-            authHeader(this)
+            // ELIMINAMOS authHeader(this)
         }.body()
     }
 
     suspend fun getAudioFeatures(id: String): String {
         return client.get("https://api.spotify.com/v1/audio-features/$id") {
-            authHeader(this)
+            // ELIMINAMOS authHeader(this)
         }.body()
     }
 
@@ -42,7 +41,7 @@ class SpotifyApiService(
         seedGenres: List<String> = emptyList()
     ): String {
         return client.get("https://api.spotify.com/v1/recommendations") {
-            authHeader(this)
+            // ELIMINAMOS authHeader(this)
 
             if (seedTracks.isNotEmpty())
                 parameter("seed_tracks", seedTracks.joinToString(","))

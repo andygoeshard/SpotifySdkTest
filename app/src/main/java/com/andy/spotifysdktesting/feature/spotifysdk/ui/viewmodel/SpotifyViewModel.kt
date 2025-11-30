@@ -11,14 +11,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class SpotifyViewModel(application: Application) : AndroidViewModel(application) {
-    val spotifyManager = SpotifyManager(application.applicationContext)
+data class SpotifyState(
+    val isConnected: Boolean,
+    val currentTrack: CurrentTrack?
+)
 
-    private val _isConnected = MutableStateFlow(false)
-    val isConnected: StateFlow<Boolean> = _isConnected
-
-    private val _currentTrack = MutableStateFlow<CurrentTrack?>(null)
-    val currentTrack: StateFlow<CurrentTrack?> = _currentTrack
+class SpotifyViewModel(
+    application: Application,
+    private val spotifyManager: SpotifyManager,)
+    : AndroidViewModel(application) {
+    private val _spotifyState = MutableStateFlow(SpotifyState(false, null))
+    val spotifyState: StateFlow<SpotifyState> = _spotifyState
 
     private var trackJob: Job? = null
     private var connectionJob: Job? = null
@@ -29,19 +32,14 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
         connectionJob?.cancel()
 
         connectionJob = viewModelScope.launch {
-            // El Flow se mantiene activo y emitirá el estado de la conexión.
             spotifyManager.connect(clientId, redirectUri).collect { connected ->
                 if (connected) {
                     observeCurrentTrack()
                     println("🔌 CONECTADO A SPOTIFY SDK :D")
-                    _isConnected.value = true
                 } else {
-                    // Si falla, cancelamos la observación de track.
                     trackJob?.cancel()
-                    _isConnected.value = false
-                    _currentTrack.value = null
+                    _spotifyState.value = SpotifyState(false, null)
                     println("🔌 NO CONECTADO A SPOTIFY SDK… retry")
-
                 }
             }
         }
@@ -53,9 +51,9 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
             spotifyManager
                 .getCurrentlyPlayingTrack()
                 .collect { trackInfo ->
-                    _currentTrack.value = trackInfo.copy(
+                    _spotifyState.value = SpotifyState(true, trackInfo.copy(
                         imageUri = spotifyManager.imageUrl(trackInfo.imageUri)
-                    )
+                    ))
                 }
         }
     }
@@ -63,16 +61,33 @@ class SpotifyViewModel(application: Application) : AndroidViewModel(application)
     fun disconnectFromSpotify() {
         trackJob?.cancel()
         trackJob = null
-
         spotifyManager.disconnect()
-
-        _isConnected.value = false
-        _currentTrack.value = null
+        _spotifyState.value = SpotifyState(false, null)
     }
 
     override fun onCleared() {
         super.onCleared()
-        connectionJob?.cancel() // Asegurar la limpieza del Job de conexión
+        connectionJob?.cancel()
         disconnectFromSpotify()
+    }
+
+    fun resume() {
+        spotifyManager.play()
+    }
+
+    fun pause() {
+        spotifyManager.pause()
+    }
+
+    fun skipNext() {
+        spotifyManager.next()
+    }
+
+    fun skipPrevious() {
+        spotifyManager.previous()
+    }
+
+    fun playUri(uri: String) {
+        spotifyManager.playUri(uri)
     }
 }

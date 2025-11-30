@@ -7,12 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.screen.SpotifyScreen
 import com.andy.spotifysdktesting.app.ui.theme.SpotifySdkTestingTheme
 import com.andy.spotifysdktesting.core.ai.presentation.screen.AiScreen
 import com.andy.spotifysdktesting.core.navigation.presentation.screen.MainScaffold
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModel
-import com.andy.spotifysdktesting.core.tts.presentation.screen.DjScreen
+import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModelIntent
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.handler.SpotifyAuthDeeplinkHandler
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.RedirectActivity
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthViewModel
@@ -58,12 +57,19 @@ class MainActivity : ComponentActivity() {
 
             if (code != null) {
                 println("MainActivity instance hash: ${System.identityHashCode(home)}")
-                home.onSpotifyCodeReceived(code)
+                val intent = HomeViewModelIntent.OnSpotifyCodeReceived(code)
+
+                // 🎯 Enviamos el Intent al único punto de entrada
+                home.processIntent(intent)
             } else {
-                // Manejar error o cancelación (ej. uri contiene ?error=access_denied)
-                val error = uri.getQueryParameter("error")
-                println("Error en login de Spotify: $error")
+                // Opcional: Manejar el caso de que el Deep Link no traiga código,
+                // lo cual podría ser otro Intent (ej. HomeViewModelIntent.LoginFailed)
             }
+        } else {
+            // Manejar error o cancelación (ej. uri contiene ?error=access_denied)
+            val error = uri.getQueryParameter("error")
+            println("Error en login de Spotify: $error")
         }
     }
 }
+

@@ -17,10 +17,8 @@ class SpotifyManager(
 
     private var spotifyAppRemote: SpotifyAppRemote? = null
 
-    /** Token de la Web API (PKCE). Lo setea tu autenticación */
     var accessToken: String? = null
 
-    /** Última canción escuchada (cacheado para IA) */
     var currentTrackCache: CurrentTrack? = null
 
     // -----------------------------------------------------------
@@ -119,15 +117,11 @@ class SpotifyManager(
         spotifyAppRemote?.playerApi?.skipPrevious()
     }
 
-    /** 🔥 NUEVO: Reproduce directamente una canción usando una URI */
     fun playUri(uri: String) {
         spotifyAppRemote?.playerApi?.play(uri)
             ?: Log.e("SpotifyManager", "Not connected. Cannot play URI.")
     }
 
-    // -----------------------------------------------------------
-    //  IMAGE HELPER
-    // -----------------------------------------------------------
     fun imageUrl(imgUri: String?): String? {
         if (imgUri == null) return null
         return try {
