@@ -1,14 +1,17 @@
 package com.andy.spotifysdktesting.core.tts.data
 
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
+import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import com.andy.spotifysdktesting.core.tts.domain.TtsEngine
 import com.andy.spotifysdktesting.core.tts.domain.TtsResult
 import com.andy.spotifysdktesting.core.tts.domain.TtsVoice
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.io.File
-import java.io.FileInputStream
 import java.util.Locale
 import kotlin.coroutines.resume
 
@@ -20,15 +23,36 @@ class AndroidTtsEngine(
 
     private val appContext = context.applicationContext
     private var tts: TextToSpeech? = null
-    private val tempAudioFile: File = File(appContext.cacheDir, "temp_tts_audio.wav")
+    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     init {
-        // La inicialización del TTS nativo es asíncrona
         tts = TextToSpeech(appContext) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                // Configuración inicial
+
+                val audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+                tts?.setAudioAttributes(audioAttributes)
+
+                // === AUDIOFOCUS CON DUCKING REAL ===
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioFocusRequest = AudioFocusRequest.Builder(
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                    )
+                        .setAudioAttributes(audioAttributes)
+                        .setAcceptsDelayedFocusGain(true)
+                        .setOnAudioFocusChangeListener { change ->
+                            Log.d(TAG, "Audio focus changed: $change")
+                        }
+                        .build()
+                }
+
                 tts?.language = Locale.getDefault()
-                Log.d(TAG, "Android TTS inicializado con éxito.")
+
+                Log.d(TAG, "Android TTS inicializado con DUCKING.")
             } else {
                 Log.e(TAG, "Fallo al inicializar Android TTS: $status")
                 tts = null
@@ -41,63 +65,90 @@ class AndroidTtsEngine(
         voice: TtsVoice
     ): TtsResult = suspendCancellableCoroutine { continuation ->
 
-        if (tts == null) {
-            continuation.resume(TtsResult.Error("Motor TTS nativo no inicializado o fallido."))
+        val engine = tts
+        if (engine == null) {
+            continuation.resume(TtsResult.Error("Motor TTS nativo no inicializado."))
             return@suspendCancellableCoroutine
         }
 
-        // 💡 1. Configurar la voz (si se quiere una específica)
-        // Implementar lógica para buscar y seleccionar la voz por TtsVoice.id
-        // Por simplicidad, aquí usamos la configuración por defecto.
+        // === SOLICITAR AUDIO FOCUS CON DUCKING ===
+        val focusGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioManager.requestAudioFocus(audioFocusRequest!!)
+        } else {
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+            )
+        }
+
+        if (focusGranted != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+            continuation.resume(TtsResult.Error("No se obtuvo audio focus."))
+            return@suspendCancellableCoroutine
+        }
 
         val utteranceId = text.hashCode().toString()
 
-        // 💡 2. Usar synthesizeToFile (más robusto que speak() para devolver bytes)
-        val result = tts!!.synthesizeToFile(
+        val params = Bundle().apply {
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+        }
+
+        val result = engine.speak(
             text,
-            null, // Usar parámetros por defecto, o Voice.getParams()
-            tempAudioFile,
+            TextToSpeech.QUEUE_FLUSH,
+            params,
             utteranceId
         )
 
         if (result == TextToSpeech.ERROR) {
-            continuation.resume(TtsResult.Error("Fallo al iniciar la síntesis del archivo."))
+            continuation.resume(TtsResult.Error("Error al iniciar TTS."))
             return@suspendCancellableCoroutine
         }
 
-        // 💡 3. Escuchar cuándo termina la síntesis
-        tts!!.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-            override fun onStop(utteranceId: String?, interrupted: Boolean) {}
+        engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+
+            override fun onStart(utteranceId: String?) {
+                Log.d(TAG, "TTS START $utteranceId")
+            }
 
             override fun onDone(id: String?) {
                 if (id == utteranceId) {
-                    try {
-                        val audioBytes = FileInputStream(tempAudioFile).use { it.readBytes() }
-                        tempAudioFile.delete() // Limpiar el archivo temporal
-                        continuation.resume(TtsResult.Success(audioBytes))
-                    } catch (e: Exception) {
-                        continuation.resume(TtsResult.Error("Error leyendo o limpiando el archivo TTS.", e))
+
+                    // === LIBERAR FOCUS ===
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+                    } else {
+                        audioManager.abandonAudioFocus(null)
                     }
+
+                    continuation.resume(TtsResult.Success(ByteArray(0)))
                 }
             }
-            // Manejo de errores
+
             override fun onError(id: String?) {
-                continuation.resume(TtsResult.Error("Error durante la síntesis TTS nativa."))
-                tempAudioFile.delete()
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+                } else {
+                    audioManager.abandonAudioFocus(null)
+                }
+
+                continuation.resume(TtsResult.Error("Error durante TTS."))
             }
-            override fun onError(id: String?, errorCode: Int) {
-                onError(id) // Usar el método obsoleto como fallback
-            }
+
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {}
         })
 
         continuation.invokeOnCancellation {
-            tts?.stop()
-            tempAudioFile.delete()
+            engine.stop()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+            } else {
+                audioManager.abandonAudioFocus(null)
+            }
         }
     }
 
-    // Función de limpieza para el ciclo de vida del Service
     fun shutdown() {
         tts?.stop()
         tts?.shutdown()

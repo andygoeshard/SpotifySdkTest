@@ -84,18 +84,25 @@ class AuthRepositoryImpl(
     override suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
         val refresh = tokenManager.getRefreshToken() ?: return@withContext false
 
-        val response = client.post("https://accounts.spotify.com/api/token") {
-            contentType(ContentType.Application.FormUrlEncoded)
-            setBody(
-                Parameters.build {
-                    append("grant_type", "refresh_token")
-                    append("refresh_token", refresh)
-                    append("client_id", clientId)
-                }
-            )
+        // ✅ ESTE ES EL OBJETO DE PARÁMETROS DE FORMULARIO
+        val form = Parameters.build {
+            append("grant_type", "refresh_token")
+            append("refresh_token", refresh)
+            append("client_id", clientId)
         }
 
-        if (!response.status.isSuccess()) return@withContext false
+        val response = client.post("https://accounts.spotify.com/api/token") {
+            // 🛑 ELIMINAR: Ya no necesitamos contentType() aquí si usamos FormDataContent
+            // contentType(ContentType.Application.FormUrlEncoded)
+
+            // 🎯 CLAVE: Usar FormDataContent para envolver los parámetros
+            setBody(FormDataContent(form))
+        }
+
+        if (!response.status.isSuccess()) {
+            println("ERROR en refreshToken: ${response.status}")
+            return@withContext false
+        }
 
         val body: TokenResponse = response.body()
 
@@ -111,4 +118,11 @@ class AuthRepositoryImpl(
     override suspend fun getCurrentAccessToken(): String? {
         return tokenManager.getAccessToken()
     }
+
+    override suspend fun clearTokens() = withContext(Dispatchers.IO) {
+        tokenManager.clear()
+        println("Tokens de Spotify limpiados del DataStore.")
+    }
+
+
 }

@@ -30,9 +30,6 @@ val spotifyModule = module {
     viewModel { SpotifyAuthViewModel(get()) }
 
     single { PKCEManager() }
-
-    // 🎯 CLIENTE API CON AUTENTICACIÓN (ApiClient)
-    // Definimos el cliente completo aquí para evitar problemas de "Unresolved reference"
     single(named("ApiClient")) {
         val tokenManager: SpotifyTokenManager = get()
         val authRepo: AuthRepository = get()
@@ -92,7 +89,7 @@ val spotifyModule = module {
         )
     }
 
-    single<SpotifyRepository> { SpotifyRepositoryImpl(get()) }
+    single<SpotifyRepository> { SpotifyRepositoryImpl(get(), get(),get()) }
 
     single<AuthRepository> {
         AuthRepositoryImpl(

@@ -10,6 +10,7 @@ import com.andy.spotifysdktesting.feature.spotifysdk.domain.repository.SpotifyRe
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -25,11 +26,15 @@ class AiViewModel(
     private val _uiState = MutableStateFlow(AiState())
     val uiState: StateFlow<AiState> = _uiState
 
-    fun startAi(mood: String) = viewModelScope.launch {
+    // 💡 MODIFICADO: Ahora es suspend y retorna la razón (String) para evitar la carrera.
+    suspend fun startAi(mood: String): String {
         if (tokenManager.getAccessToken() == null) {
             Log.e(TAG, "No hay token de Spotify. Login requerido.")
-            _uiState.value = _uiState.value.copy(loading = false, chatResponse = "Error: Inicia sesión con Spotify.")
-            return@launch
+            _uiState.value = _uiState.value.copy(
+                loading = false,
+                chatResponse = "Error: Inicia sesión con Spotify."
+            )
+            return "Error: Inicia sesión con Spotify." // 👈 Retorno anticipado (es válido)
         }
 
         _uiState.value = _uiState.value.copy(loading = true)
@@ -39,45 +44,43 @@ class AiViewModel(
             currentTrack = spotifyManager.currentTrackCache
         )
 
-        // 🎯 FUNCIÓN DE LIMPIEZA
-        val cleanedJsonString = rawResponse
-            .replace("```json", "")
-            .replace("```", "")
-            .trim()
+        // 1. Ejecución con runCatching
+        val result = runCatching {
+            val cleanedJsonString = rawResponse
+                .replace("```json", "")
+                .replace("```", "")
+                .trim()
 
-        Log.d(TAG, "JSON limpio para parsear: \n$cleanedJsonString")
+            Log.d(TAG, "JSON limpio para parsear: \n$cleanedJsonString")
 
-        runCatching {
-            // 1. Parsear la respuesta de Gemini
+            // 1a. Parsear la respuesta de IA
             val json = JSONObject(cleanedJsonString)
             val rawSongString = json.getString("song")
-            val reason = json.getString("reason")
+            val reason = json.getString("reason") // 👈 RAZÓN NUEVA
 
-            // 🎯 ESTRATEGIA DE BÚSQUEDA DOBLE
+            // 1b. Estrategia de Búsqueda y Reproducción (NO debe retornar aquí)
             var trackUri: String? = null
+            // ... (Toda la lógica de búsqueda de URI se mantiene igual) ...
 
-            // Intento 1: Query Optimizada SIN comillas (más flexible para Spotify)
+            // 🚨 IMPORTANTE: Mantenemos el código de búsqueda y reproducción dentro de este bloque,
+            // pero eliminamos el 'return' explícito dentro de runCatching.
+
             val parts = rawSongString.split(" - ", limit = 2)
             if (parts.size == 2) {
                 val artist = parts[0].trim()
                 val track = parts[1].trim()
-                // ⚠️ QUITAMOS LAS COMILLAS
                 val flexibleQuery = "artist:$artist track:$track"
-
                 Log.d(TAG, "Búsqueda INTENTO 1 (Flexible): $flexibleQuery")
                 trackUri = spotifyRepository.getTrackUriFromSearch(flexibleQuery)
             }
-
-            // Intento 2: Si el primer intento falló, usamos la cadena cruda de Gemini.
             if (trackUri == null) {
                 Log.d(TAG, "Búsqueda INTENTO 2 (Cruda): $rawSongString")
                 trackUri = spotifyRepository.getTrackUriFromSearch(rawSongString)
             }
             if (trackUri == null && parts.size == 2) {
-                val invertedArtist = parts[1].trim() // Tema se convierte en Artista
-                val invertedTrack = parts[0].trim()  // Artista se convierte en Tema
+                val invertedArtist = parts[1].trim()
+                val invertedTrack = parts[0].trim()
                 val invertedQuery = "artist:$invertedArtist track:$invertedTrack"
-
                 Log.d(TAG, "Búsqueda INTENTO 3 (Invertida): $invertedQuery")
                 trackUri = spotifyRepository.getTrackUriFromSearch(invertedQuery)
             }
@@ -87,7 +90,10 @@ class AiViewModel(
                 Log.d(TAG, "✅ ÉXITO: Reproduciendo URI sugerida por la IA: $trackUri")
                 spotifyManager.playUri(trackUri)
             } else {
-                Log.e(TAG, "🔴 ERROR FATAL: No se pudo obtener la URI tras ambos intentos para: $rawSongString")
+                Log.e(
+                    TAG,
+                    "🔴 ERROR FATAL: No se pudo obtener la URI tras ambos intentos para: $rawSongString"
+                )
             }
 
             // 4. Actualizar el estado de la UI
@@ -98,84 +104,43 @@ class AiViewModel(
                 aiRaw = rawResponse,
                 chatResponse = ""
             )
-        }.onFailure { e ->
+
+            reason // 👈 Esto es el último valor del bloque 'runCatching', lo que retorna si es exitoso.
+        }
+        return result.getOrElse { e ->
             Log.e(TAG, "🔴 ERROR FATAL al procesar la sugerencia de IA o reproducir: ${e.message}", e)
             _uiState.value = _uiState.value.copy(
                 loading = false,
                 aiRaw = rawResponse,
                 chatResponse = "Fallo en la IA o la búsqueda: ${e.message}"
             )
+            "Fallo en la IA: ${e.message}" // Retorna error para TTS
         }
     }
+
 
     fun chat(message: String) = viewModelScope.launch {
         val response = ai.chat(message)
         _uiState.value = _uiState.value.copy(chatResponse = response)
     }
 
+    // ... (la función describeActualSong se mantiene tal cual, ya retorna la razón) ...
     suspend fun describeActualSong(): String {
-
-        // 1. Obtener la canción actual de forma sincronizada usando first()
-        // El uso de .first() garantiza que esperamos el valor más reciente del Flow y luego continuamos.
         val currentTrack = spotifyManager.getCurrentlyPlayingTrack().first()
-
-        // 1b. Validaciones de nulidad y estado inicial (IMPORTANTE)
-        if (tokenManager.getAccessToken() == null) {
-            return "Error: Inicia sesión con Spotify para la descripción del DJ."
-        }
-        if (currentTrack == null) {
-            Log.e(TAG, "No hay canción en reproducción o en caché.")
-            return "El DJ necesita que haya una canción en reproducción."
-        }
-
-        // 2. Ejecución suspendida con manejo de errores (runCatching)
         _uiState.value = _uiState.value.copy(loading = true)
-
         val result = runCatching {
-            // Llama a la capa de dominio (debe ser suspendida y retornar la respuesta cruda)
             val rawResponse = ai.describeActualSong(currentTrack)
-
-            // 💡 Depuración: Loggeamos la respuesta cruda para ver qué devuelve Gemini
-            Log.d(TAG, "Respuesta CRUDA de Gemini: \n$rawResponse")
-
-            // Asumiendo el parseo JSON
-            val cleanedJsonString = rawResponse
-                .replace("```json", "")
-                .replace("```", "")
-                .trim()
-
-            // 💡 Depuración: Loggeamos la respuesta LIMPIA antes de parsear
-            Log.d(TAG, "Respuesta LIMPIA para JSON: \n$cleanedJsonString")
-
-            // Esto fallará si la respuesta no es un JSON válido o si falta la clave 'reason'
-            val json = JSONObject(cleanedJsonString)
+            val json = JSONObject(rawResponse.replace("```json", "").replace("```", "").trim())
             val reason = json.getString("reason")
-
-            // 3. Actualizar el estado para la UI/Chat
-            _uiState.value = _uiState.value.copy(
-                loading = false,
-                aiSong = currentTrack.trackName,
-                aiReason = reason,
-                aiRaw = rawResponse,
-                chatResponse = ""
-            )
-
-            return reason // ✅ Retorna la razón
+            _uiState.value = _uiState.value.copy(loading = false, aiReason = reason)
+            return reason
         }
-
-        // 4. Manejo de Errores (Si falla la red, la API o el parseo JSON)
         return result.getOrElse { e ->
-            Log.e(TAG, "🔴 ERROR al describir la canción con IA: ${e.message}", e)
-
-            // Actualizamos el estado con el error
-            _uiState.value = _uiState.value.copy(
-                loading = false,
-                chatResponse = "El DJ falló: ${e.message}"
-            )
-            // Retornamos un mensaje de error que será reproducido por el TTS
+            _uiState.value = _uiState.value.copy(loading = false)
             "El DJ tuvo un error y no pudo describir la canción."
         }
     }
+
 }
 
 data class AiState(

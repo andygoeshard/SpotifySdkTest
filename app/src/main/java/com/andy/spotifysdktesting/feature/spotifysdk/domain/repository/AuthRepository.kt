@@ -6,4 +6,5 @@ interface AuthRepository {
     suspend fun exchangeCodeForToken(code: String): Boolean // Antes (code, verifier)
     suspend fun refreshToken(): Boolean
     suspend fun getCurrentAccessToken(): String?
+    suspend fun clearTokens()
 }

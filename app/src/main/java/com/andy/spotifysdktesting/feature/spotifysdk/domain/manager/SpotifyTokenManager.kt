@@ -16,8 +16,10 @@ class SpotifyTokenManager(private val context: Context) {
         private val KEY_ACCESS = stringPreferencesKey("access_token")
         private val KEY_REFRESH = stringPreferencesKey("refresh_token")
         private val KEY_EXPIRES = longPreferencesKey("expires_at")
-        // NUEVA CLAVE PARA EL VERIFIER
         private val KEY_VERIFIER = stringPreferencesKey("code_verifier")
+
+        // 🎯 Margen de seguridad: 5 minutos antes de la expiración real (en milisegundos)
+        private const val EXPIRATION_SAFETY_MARGIN_MS = 5 * 60 * 1000L
     }
 
     suspend fun saveTokens(
@@ -25,7 +27,8 @@ class SpotifyTokenManager(private val context: Context) {
         refreshToken: String?,
         expiresInSeconds: Long
     ) {
-        val expiresAt = System.currentTimeMillis() + (expiresInSeconds * 1000)
+        // 🎯 CLAVE: expiresAt es la marca de tiempo futura.
+        val expiresAt = System.currentTimeMillis() + (expiresInSeconds * 1000L) // Usar 'L' para Long
 
         context.dataStore.edit { prefs ->
             prefs[KEY_ACCESS] = accessToken
@@ -34,7 +37,24 @@ class SpotifyTokenManager(private val context: Context) {
         }
     }
 
-    // --- MÉTODOS DE VERIFIER (NUEVO) ---
+    suspend fun isAccessTokenExpired(): Boolean {
+        // 1. Obtener el tiempo de expiración guardado
+        val expirationTime = getExpirationTime()
+
+        // Si es 0L, significa que no hay token o no se ha guardado el tiempo.
+        if (expirationTime == 0L) return true
+
+        // 2. Tiempo actual
+        val now = System.currentTimeMillis()
+
+        // 3. Comparación: si el tiempo actual es mayor o igual que (la expiración - el margen)
+        val isExpired = now >= (expirationTime - EXPIRATION_SAFETY_MARGIN_MS)
+
+        return isExpired
+    }
+
+
+    // --- MÉTODOS DE VERIFIER Y EXISTENTES (Se mantienen) ---
 
     suspend fun saveVerifier(verifier: String) {
         context.dataStore.edit { prefs ->
@@ -46,14 +66,11 @@ class SpotifyTokenManager(private val context: Context) {
         return context.dataStore.data.map { it[KEY_VERIFIER] }.first()
     }
 
-    // Opcional: Para limpiar el verifier después de usarlo (buena práctica)
     suspend fun clearVerifier() {
         context.dataStore.edit { prefs ->
             prefs.remove(KEY_VERIFIER)
         }
     }
-
-    // --- MÉTODOS EXISTENTES ---
 
     suspend fun getAccessToken(): String? {
         return context.dataStore.data.map { it[KEY_ACCESS] }.first()
@@ -63,6 +80,7 @@ class SpotifyTokenManager(private val context: Context) {
         return context.dataStore.data.map { it[KEY_REFRESH] }.first()
     }
 
+    // 💡 Método renombrado (era getExpirationTime) para mayor claridad, pero su lógica es correcta.
     suspend fun getExpirationTime(): Long {
         return context.dataStore.data.map { it[KEY_EXPIRES] ?: 0L }.first()
     }

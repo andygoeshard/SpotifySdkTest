@@ -1,6 +1,8 @@
 package com.andy.spotifysdktesting.core.tts.di
 
+import androidx.media3.exoplayer.ExoPlayer
 import com.andy.spotifysdktesting.BuildConfig
+import com.andy.spotifysdktesting.core.tts.data.AndroidTtsEngine
 import com.andy.spotifysdktesting.core.tts.data.ElevenLabsEngine
 import com.andy.spotifysdktesting.core.tts.domain.TtsEngine
 import com.andy.spotifysdktesting.core.tts.domain.TtsManager
@@ -14,22 +16,31 @@ import org.koin.dsl.module
 
 val ttsModule = module {
 
+    single {
+        ExoPlayer.Builder(androidContext()).build()
+    }
+
     single<TtsEngine>(named("eleven")) {
         ElevenLabsEngine(
             apiKey = BuildConfig.ELEVEN_API_KEY,
             client = get(named("AuthClient"))
         )
     }
+    single<TtsEngine>(named("android")) {
+        AndroidTtsEngine(androidContext())
+    }
 
-    // TtsManager
     single {
         TtsManager(
-            eleven = get(named("eleven"))
+            eleven = get(named("eleven")),
+            androidNative = get(named("android"))
         )
     }
 
-    // AudioPlayer (si tiene dependencias, las agregás)
-    single { AudioPlayer(androidContext()) }
+    single { AudioPlayer(
+        androidContext(),
+        exoPlayer = get()
+    ) }
     viewModel { TtsViewModel(
         get(),
         audioPlayer = get()

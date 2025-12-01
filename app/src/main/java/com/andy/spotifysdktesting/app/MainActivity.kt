@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import com.andy.spotifysdktesting.app.ui.theme.SpotifySdkTestingTheme
-import com.andy.spotifysdktesting.core.ai.presentation.screen.AiScreen
 import com.andy.spotifysdktesting.core.navigation.presentation.screen.MainScaffold
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModel
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModelIntent

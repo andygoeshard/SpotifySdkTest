@@ -11,12 +11,16 @@ import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthSta
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthViewModel
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyState
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.withContext
 
 data class HomeViewState(
     val spotifyState: SpotifyState,
@@ -40,14 +44,22 @@ sealed class HomeViewModelIntent {
     data object OnPause : HomeViewModelIntent()
 }
 
-// ----------------------------------------------------------------------
-// 3. EL VIEWMODEL (El Motor MVI)
+// 🎯 EVENTOS: Para acciones únicas (ej. navegación)
+sealed class HomeEvent {
+    data object NavigateToLogin : HomeEvent()
+    data class ShowSnackbar(val message: String) : HomeEvent()
+}
+
 class HomeViewModel(
     private val spotify: SpotifyViewModel,
     private val ai: AiViewModel,
     private val tts: TtsViewModel,
     private val auth: SpotifyAuthViewModel
 ) : ViewModel() {
+
+    // 🎯 CANAL DE EVENTOS: Solo para UI (Navegación, Snackbar, etc.)
+    private val _event = Channel<HomeEvent>(Channel.BUFFERED)
+    val event = _event.receiveAsFlow()
 
     // 🎯 NUEVO: CONTADOR Y CICLO DEL DJ
     private var songCounter: Int = 0
@@ -101,83 +113,104 @@ class HomeViewModel(
     // LÓGICA DEL DJ AUTOMÁTICO
 
     private fun askAiForNextSong()= viewModelScope.launch {
-        // 1. Pedir a la IA la canción (solo sugerencia)
-        ai.startAi("cambiame el mood, rompeme la caja")
-        // 2. Opcional: Si quieres que hable INMEDIATAMENTE después de la sugerencia:
-        triggerDjSequence(isImmediateSuggestion = false)
+        try {
+            // 1. Llama a la IA: Pide la próxima canción y el mood. Obtiene la razón (texto).
+            val reason = ai.startAi("cambiame el mood, rompeme la caja")
+            // 2. 🎯 USA EL VALOR RETORNADO: Orquesta la narración.
+            triggerDjSequence(reason)
+        } catch (e: Exception) {
+            handleAuthException(e) // 💡 Manejar el fallo de token/API
+        }
     }
 
-    private fun observeCurrentTrackChanges() {
-        viewModelScope.launch {
-            spotify.spotifyState.collect { state ->
-
-                // 🛑 CORRECCIÓN FINAL: Usamos los campos exactos de CurrentTrack.
-                val currentTrack = state.currentTrack
-
-                val currentId = if (currentTrack != null) {
-                    // Combinamos Artista y Título para obtener un identificador único
-                    // Ej: "Duki | Goteo"
-                    "${currentTrack.artistName} | ${currentTrack.trackName}"
-                } else {
-                    null
-                }
-
-                // 1. Si el ID es nulo, vacío, o no hay cambio, terminamos.
-                if (currentId.isNullOrBlank() || currentId == lastTrackUri) {
-                    return@collect
-                }
-
-                // 2. CAMBIO DE CANCIÓN DETECTADO
-                println("🎵 Cambio de canción detectado: $currentId (Anterior: $lastTrackUri)")
-                lastTrackUri = currentId
-
-                // 3. Incrementar el contador y chequear la interrupción
-                checkDjInterruption()
-            }
+    private fun djExplainCurrentSong() = viewModelScope.launch {
+        try {
+            // 1. Llama a la IA: Pide la explicación de la canción actual. Obtiene la razón (texto).
+            val reason = ai.describeActualSong()
+            // 2. 🎯 USA EL VALOR RETORNADO: Orquesta la narración.
+            triggerDjSequence(reason)
+        } catch (e: Exception) {
+            handleAuthException(e) // 💡 Manejar el fallo de token/API
         }
     }
 
     private fun checkDjInterruption() {
         songCounter++
-
         println("🎶 Contador de canciones: $songCounter / $DJ_CYCLE_LENGTH")
 
         if (songCounter >= DJ_CYCLE_LENGTH) {
             println("🚨 CICLO CUMPLIDO. Iniciando Interrupción del DJ.")
             songCounter = 0
-            triggerDjSequence()
+            viewModelScope.launch {
+                try {
+                    val reason = ai.describeActualSong()
+                    triggerDjSequence(reason)
+                } catch (e: Exception) {
+                    handleAuthException(e)
+                }
+            }
         }
-    }
-
-    private fun triggerDjSequence(isImmediateSuggestion: Boolean = false) = viewModelScope.launch {
-
-        val reason: String = if (!isImmediateSuggestion) {
-            ai.describeActualSong()
-        } else {
-            ai.uiState.value.aiReason
-        }
-
-        if (reason.isBlank()) {
-            println("⚠️ Razón de IA vacía, saltando narración y continuando.")
-            spotify.resume()
-            return@launch
-        }
-
-
-        // B. Narrar la razón
-        println("🎤 DJ Narrando: $reason")
-
-        tts.onEvent(TtsEvent.SpeakText(reason))
-        tts.awaitSpeakCompletion()
-
-    }
-
-    private fun djExplainCurrentSong() {
-        triggerDjSequence()
     }
 
     // ----------------------------------------------------------------------
-    // LÓGICA INTERNA Y GESTIÓN DE FLUJOS (Sin cambios)
+    // 🔐 GESTIÓN DE ERRORES DE AUTENTICACIÓN (CLAVE)
+
+    private suspend fun handleAuthException(e: Exception) {
+        val errorMessage = e.message ?: ""
+
+        // Asume que SpotifyRepositoryImpl lanza un error con este mensaje si la renovación falla
+        if (errorMessage.contains("Re-login necesario", ignoreCase = true)) {
+            println("🚨 RENOVACIÓN FALLIDA. Forzando re-login en la UI.")
+            // 1. Limpiar el estado local de tokens
+            auth.clearTokensAndForceLogin()
+            // 2. Notificar a la UI para la navegación
+            _event.send(HomeEvent.NavigateToLogin)
+        } else {
+            // Error de red, TTS, o AI que no requiere re-login. Mostrar un Snackbar.
+            _event.send(HomeEvent.ShowSnackbar(errorMessage))
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // LÓGICA INTERNA Y GESTIÓN DE FLUJOS (Se mantienen)
+
+    // ... (El resto de tus funciones como observeCurrentTrackChanges, etc.)
+
+    private fun observeCurrentTrackChanges() {
+        viewModelScope.launch {
+            spotify.spotifyState.collect { state ->
+                val currentTrack = state.currentTrack
+                val currentId = if (currentTrack != null) {
+                    "${currentTrack.artistName} | ${currentTrack.trackName}"
+                } else {
+                    null
+                }
+
+                if (currentId.isNullOrBlank() || currentId == lastTrackUri) {
+                    return@collect
+                }
+
+                println("🎵 Cambio de canción detectado: $currentId (Anterior: $lastTrackUri)")
+                lastTrackUri = currentId
+                checkDjInterruption()
+            }
+        }
+    }
+
+    private fun triggerDjSequence(reason: String) = viewModelScope.launch {
+
+        if (reason.isBlank() || reason.startsWith("Error:")) {
+            println("⚠️ Razón de IA vacía o con error, saltando narración.")
+            spotify.resume()
+            return@launch
+        }
+        println("🎤 DJ Narrando: $reason")
+        withContext(Dispatchers.IO) {
+            tts.onEvent(TtsEvent.SpeakText(reason))
+            tts.awaitSpeakCompletion()
+        }
+        spotify.resume()
+    }
 
     private fun handleCodeReceived(code: String) {
         println("🔔 HOMEVIEWMODEL RECIBIÓ CODE: $code")

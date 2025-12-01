@@ -6,37 +6,51 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.util.Log
+import androidx.annotation.OptIn
 import java.io.File
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.ByteArrayDataSource
+import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import java.io.IOException
 
 private const val TAG = "AudioPlayer"
 
 class AudioPlayer(
-    private val context: Context
+    context: Context,
+    private val exoPlayer: ExoPlayer
 ) {
-
-    private var player: ExoPlayer? = null
-
-    // 💡 1. Inicializar el AudioManager
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-    // 💡 2. Listener de Foco de Audio (Necesario para las APIs modernas y deprecadas)
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        // No se necesita lógica aquí porque ExoPlayer ya se gestiona con el onPlaybackStateChanged
-        // pero este listener es requerido por la API para saber qué app está pidiendo el foco.
         Log.d(TAG, "Audio focus changed: $focusChange")
     }
+    private var onPlaybackEndedCallback: (() -> Unit)? = null
 
-    /**
-     * Prepara el archivo de audio, solicita el foco de audio (con ducking),
-     * y comienza la reproducción.
-     */
+    init {
+        // 🎯 Configuración del listener al inicio para el Singleton
+        exoPlayer.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == ExoPlayer.STATE_ENDED) {
+                    Log.d(TAG, "TTS playback ended.")
+                    abandonAudioFocus()
+                    onPlaybackEndedCallback?.invoke()
+                    exoPlayer.clearMediaItems()
+                    exoPlayer.seekTo(0)
+                }
+            }
+        })
+    }
+    @OptIn(UnstableApi::class)
     fun play(audio: ByteArray, onFinish: (() -> Unit)? = null) {
-        stop() // Asegura que cualquier reproducción anterior se detenga
+        // 🛑 No llamamos a stop() o release(), solo limpiamos la reproducción anterior.
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+
+        onPlaybackEndedCallback = onFinish
 
         // 1. Solicitud de Foco de Audio (Ducking)
         val focusResult = requestAudioFocus()
@@ -44,78 +58,38 @@ class AudioPlayer(
         if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             Log.w(TAG, "Foco de audio denegado. No se puede reproducir el TTS.")
             onFinish?.invoke()
-            return // Sale si el foco es denegado (ej. una llamada)
-        }
-
-        // 2. Escribir el audio temporalmente
-        val file = File(context.cacheDir, "tts_${System.currentTimeMillis()}.tmp")
-        try {
-            file.writeBytes(audio)
-        } catch (e: IOException) {
-            Log.e(TAG, "Error escribiendo archivo de audio temporal: ${e.message}")
-            abandonAudioFocus()
-            onFinish?.invoke()
             return
         }
 
-        // 3. Configurar ExoPlayer
-        val exo = ExoPlayer.Builder(context).build()
-        player = exo
+        // 2. 🎯 Cargar audio directamente desde la memoria (ByteArrayDataSource)
+        val source = buildMediaSourceFromBytes(audio)
 
-        val mime = when {
-            file.name.endsWith(".wav") -> MimeTypes.AUDIO_WAV
-            file.name.endsWith(".ogg") -> MimeTypes.AUDIO_OGG
-            file.name.endsWith(".opus") -> MimeTypes.AUDIO_OPUS
-            else -> MimeTypes.AUDIO_MPEG
-        }
+        exoPlayer.setMediaSource(source)
 
-        val mediaItem = MediaItem.Builder()
-            .setUri(file.toURI().toString())
-            .setMimeType(mime)
-            .build()
+        // 3. Iniciar reproducción
+        exoPlayer.prepare()
+        exoPlayer.play()
+        Log.d(TAG, "TTS playback started instantly.")
+    }
+    @OptIn(UnstableApi::class)
+    private fun buildMediaSourceFromBytes(audio: ByteArray): androidx.media3.exoplayer.source.MediaSource {
 
-        exo.setMediaItem(mediaItem)
-
-        // 4. Listener: Liberar foco y limpiar al finalizar
-        exo.addListener(object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == ExoPlayer.STATE_ENDED) {
-                    Log.d(TAG, "TTS playback ended.")
-                    // 🛑 Liberar el foco para que Spotify recupere el volumen
-                    abandonAudioFocus()
-                    onFinish?.invoke()
-                    stop()
-                    file.delete() // Limpiar archivo temporal
-                }
-            }
-        })
-
-        exo.prepare()
-        exo.play()
-        Log.d(TAG, "TTS playback started. Spotify should duck.")
+        val dataSource = ByteArrayDataSource(audio)
+        val factory = DataSource.Factory { dataSource }
+        return ProgressiveMediaSource.Factory(factory)
+            .createMediaSource(MediaItem.fromUri(android.net.Uri.EMPTY))
     }
 
-    /**
-     * Detiene la reproducción y libera los recursos del reproductor.
-     */
+    fun release() {
+        exoPlayer.release()
+        abandonAudioFocus()
+        Log.d(TAG, "ExoPlayer liberado.")
+    }
+
     fun stop() {
-        player?.run {
-            stop()
-            release()
-        }
-        player = null
-        // 🛑 Asegurarse de liberar el foco si se llama a stop() manualmente
+        exoPlayer.stop()
         abandonAudioFocus()
     }
-
-    // ----------------------------------------------------------------------
-    // 💡 Métodos de Foco de Audio (Duck/Un-duck)
-    // ----------------------------------------------------------------------
-
-    /**
-     * Solicita foco de audio con la bandera AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK.
-     * Esto indica a otras apps multimedia (como Spotify) que bajen su volumen.
-     */
     private fun requestAudioFocus(): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val audioAttributes = AudioAttributes.Builder()
@@ -136,7 +110,7 @@ class AudioPlayer(
             audioManager.requestAudioFocus(
                 focusChangeListener,
                 AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
             )
         }
     }

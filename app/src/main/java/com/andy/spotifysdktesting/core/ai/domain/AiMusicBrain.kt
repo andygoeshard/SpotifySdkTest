@@ -1,23 +1,20 @@
 package com.andy.spotifysdktesting.core.ai.domain
 
-import androidx.media3.common.util.Log
-import com.andy.spotifysdktesting.core.ai.data.provider.GeminiClientProvider
+import android.util.Log
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.CurrentTrack
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
 
 private const val TAG = "AiMusicBrain"
 class AiMusicBrain(
-    private val gemini: GeminiClientProvider,
-    private val spotify: SpotifyManager
+    private val aiClient: AiClient,
 ) {
 
     suspend fun chooseNextSong(currentMood: String, currentTrack: CurrentTrack?): String {
 
         val prompt = """
             Sos una IA DJ. Basate en el tema actual para elegir la siguiente canción.
-            
+         
             Mood: $currentMood
-            
+         
             Tema actual:
             Nombre: ${currentTrack?.trackName}
             Artista: ${currentTrack?.artistName}
@@ -29,60 +26,54 @@ class AiMusicBrain(
             }
         """.trimIndent()
 
-        Log.d(TAG, "PROMPT enviado a Gemini: \n$prompt")
+        Log.d(TAG, "PROMPT enviado: \n$prompt")
 
-        val resp = gemini.client.generateContent(prompt)
+        val rawResponse = aiClient.generateContent(prompt)
 
-        val rawResponse = resp.text
-        if (rawResponse != null) {
-            Log.d(TAG, "RESPUESTA JSON de Gemini: \n$rawResponse")
+        if (rawResponse.isNotEmpty()) {
+            Log.d(TAG, "RESPUESTA JSON de IA: \n$rawResponse")
         } else {
-            Log.w(TAG, "RESPUESTA de Gemini fue nula.")
+            Log.w(TAG, "RESPUESTA de IA fue nula o vacía.")
         }
 
-        return rawResponse ?: ""
+        return rawResponse
     }
 
     suspend fun describeActualSong(currentTrack: CurrentTrack?): String {
-        // 🛑 CORRECCIÓN CLAVE: PIDE UN JSON ESTRICTO con la clave 'reason'
         val prompt = """
-        Sos una IA DJ. Tu objetivo es describir el tema actual como si hubiesen pasado un par de canciones antes. 
-        
-        **Tu respuesta debe ser estricta y DEBE ser un objeto JSON** con la clave "reason" que contenga tu descripción de DJ. La descripción debe durar 10 segundos o menos. NO incluyas ninguna prosa, explicación, ni bloques de código (```json) fuera del objeto JSON.
-
-        Tema actual:
+        Sos una IA DJ Carismatica. Tu objetivo es describir la cancion que esta sonando ahora mismo.
+        canción actual:
         Nombre: ${currentTrack?.trackName}
         Artista: ${currentTrack?.artistName}
-
-        Ejemplo de respuesta: {"reason": "¡Ay, ya llegó el ritmo! Después de un par de temazos, prepárense para sentir la... ¡\"Vaina Loca\" de Ozuna! ¡Dale, a bailar!"}
-        hay que respetar el json. no hace falta que sea igual, es mas, no deberia ser igual ejemplo. tiene que sonar mas argentino.
+        tiene que sonar mas argentino, pero no cringe. buena onda y compañera.
+    
+        **Tu respuesta debe ser estricta y DEBE ser un objeto JSON** con la clave "reason" que contenga tu descripción de DJ. La descripción debe durar 10 segundos o menos. NO incluyas ninguna prosa, explicación, ni bloques de código (```json) fuera del objeto JSON.
+        
+        hay que respetar el json.
     """.trimIndent()
 
-        Log.d(TAG, "PROMPT enviado a Gemini: \n$prompt")
+        Log.d(TAG, "PROMPT enviado: \n$prompt")
 
-        val resp = gemini.client.generateContent(prompt)
-        val rawResponse = resp.text
+        // 💡 LLAMADA AL CLIENTE GENÉRICO
+        val rawResponse = aiClient.generateContent(prompt)
 
-        if (rawResponse != null) {
-            Log.d(TAG, "RESPUESTA CRUDA de Gemini: \n$rawResponse")
+        if (rawResponse.isNotEmpty()) {
+            Log.d(TAG, "RESPUESTA CRUDA de IA: \n$rawResponse")
         } else {
-            Log.w(TAG, "RESPUESTA de Gemini fue nula.")
+            Log.w(TAG, "RESPUESTA de IA fue nula o vacía.")
         }
 
-        // 💡 Retornamos la respuesta cruda. El ViewModel se encargará de parsear.
-        return rawResponse ?: ""
+        return rawResponse
     }
 
     suspend fun chat(message: String): String {
-        // En el chat también puede ser útil loguear la respuesta si hay errores
-        val resp = gemini.client.generateContent(message)
-        val rawResponse = resp.text
+        val rawResponse = aiClient.generateContent(message)
 
-        if (rawResponse != null) {
-            Log.d(TAG, "RESPUESTA Chat de Gemini: \n$rawResponse")
+        if (rawResponse.isNotEmpty()) {
+            Log.d(TAG, "RESPUESTA Chat de IA: \n$rawResponse")
         }
 
-        return rawResponse ?: ""
+        return rawResponse
     }
 
 }
