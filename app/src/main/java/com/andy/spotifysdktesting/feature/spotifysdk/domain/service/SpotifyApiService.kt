@@ -50,8 +50,6 @@ class SpotifyApiService(
         }.body()
     }
 
-    // 🚀 NUEVOS ENDPOINTS PARA EL DJ
-
     suspend fun getTopTracks(limit: Int, timeRange: String): String {
         return client.get("https://api.spotify.com/v1/me/top/tracks") {
             parameter("limit", limit)

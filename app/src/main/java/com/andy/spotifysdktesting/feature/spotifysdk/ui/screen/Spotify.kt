@@ -44,6 +44,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -63,7 +64,6 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
     val spotifyState = state.spotifyState
     val trackInfo = spotifyState.currentTrack
 
-    // El componente SOLO aparece si estamos conectados Y hay una pista.
     if (!spotifyState.isConnected || trackInfo == null) {
         return
     }
@@ -80,33 +80,46 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         // 1. Imagen y Texto
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f) // 🎯 CRÍTICO: La Row principal del contenido toma el peso
+        ) {
             AsyncImage(
                 model = trackInfo.imageUri,
                 contentDescription = "Track Image",
                 modifier = Modifier.size(40.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
-            Column {
+
+            // Columna de Texto
+            Column(
+                modifier = Modifier.weight(1f) // 🎯 CRÍTICO: La Columna de texto toma el peso restante en su Row
+            ) {
                 Text(
                     text = trackInfo.trackName,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis // 🎯 CRÍTICO: Muestra "..." si no cabe
                 )
                 Text(
                     text = trackInfo.artistName,
                     color = Color.LightGray,
                     fontSize = 10.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis // 🎯 CRÍTICO: Muestra "..." si no cabe
                 )
             }
         }
 
         // 2. Controles (Play/Pause y Next)
-        Row {
+        // Esta Row debe ser ajustada para que tome su espacio intrínseco
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             // Botón Skip Previous
+            // ... (botones se mantienen igual)
             IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnPreviousSong) }) {
                 Icon(
                     painter = painterResource(id = R.drawable.baseline_skip_previous_24),
@@ -143,7 +156,7 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
         }
     }
 }
-// Mantenemos las funciones auxiliares que no usan el Dialog
+
 @Composable
 fun ToastError() {
     Toast.makeText(LocalContext.current, "Error connecting to Spotify", Toast.LENGTH_SHORT).show()

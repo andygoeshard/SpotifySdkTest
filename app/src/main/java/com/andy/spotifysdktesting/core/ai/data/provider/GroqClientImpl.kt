@@ -18,7 +18,6 @@ import io.ktor.http.contentType
 private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 private const val TAG = "GroqClientImpl"
 
-// Asegúrate de inyectar el HttpClient base que Koin provee
 class GroqClientImpl(
     apiKey: String,
     private val httpClient: HttpClient // 💡 Se inyecta el HttpClient de Koin
@@ -28,7 +27,7 @@ class GroqClientImpl(
 
     override suspend fun generateContent(prompt: String): String {
         val requestBody = GroqCompletionRequest(
-            model = "llama-3.1-8b-instant",
+            model = "llama-3.1-8b-instant", // Modelo rápido y potente
             messages = listOf(
                 GroqMessage(role = "user", content = prompt)
             ),
@@ -36,7 +35,6 @@ class GroqClientImpl(
         )
 
         return try {
-            // 💡 Llamada con Ktor
             val response: GroqResponse = httpClient.post(GROQ_URL) {
                 headers {
                     append(HttpHeaders.Authorization, authHeader)
@@ -49,7 +47,6 @@ class GroqClientImpl(
 
         } catch (e: Exception) {
             Log.e(TAG, "Error en llamada a Groq o en deserialización: ${e.message}")
-            // Devuelve una cadena vacía en caso de error
             ""
         }
     }

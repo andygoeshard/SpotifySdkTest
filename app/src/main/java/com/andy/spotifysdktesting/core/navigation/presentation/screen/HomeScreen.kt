@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeEvent
@@ -35,12 +40,11 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
 
-    // 🎯 Observa el ÚNICO ESTADO COMPUESTO
-    val state by vm.state.collectAsStateWithLifecycle() // Mejor que collectAsState
+    val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Efecto Lateral (Deep Link): Se ejecuta solo si la URL de Auth cambia
+    // ... (LaunchedEffect para AuthURL y Eventos se mantienen igual)
     LaunchedEffect(state.authState.authUrl) {
         if (state.authState.authUrl.isNotEmpty()) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.authState.authUrl))
@@ -49,13 +53,10 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
         }
     }
 
-    // 🎯 NUEVO: Observación del flujo de eventos (Manejo de re-login y Snackbar)
     LaunchedEffect(vm.event) {
         vm.event.collectLatest { event ->
             when (event) {
                 is HomeEvent.NavigateToLogin -> {
-                    // Limpiamos el URL para que se reactive el botón de Login
-                    // La limpieza de tokens se hace en el HomeViewModel
                     snackbarHostState.showSnackbar("Sesión expirada. Por favor, inicia sesión de nuevo.")
                 }
                 is HomeEvent.ShowSnackbar -> {
@@ -64,7 +65,6 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
             }
         }
     }
-
     // ------------------------------------------------
 
     Scaffold(
@@ -74,17 +74,14 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
 
                 // 1. Contenido Principal de la Pantalla (Loggeado/Desloggeado)
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(bottom = 60.dp),
+                    modifier = Modifier.fillMaxSize().padding(bottom = 80.dp), // Más espacio para la barra de abajo
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     when {
-                        // Estado 1: Deslogueado (Token no obtenido)
+                        // Estado 1: Deslogueado
                         !state.authState.isLoggedIn -> {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("Spotify requiere tu atención.", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Button(onClick = { vm.processIntent(HomeViewModelIntent.StartLogin) }) {
@@ -93,43 +90,44 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                             }
                         }
 
-                        // Estado 2: Logueado, pero el SDK aún no está conectado
+                        // Estado 2: Conectando SDK
                         !state.spotifyState.isConnected -> {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("🔌 Conectando a Spotify SDK...")
                                 Text("Asegúrate de tener la app de Spotify abierta.")
                             }
                         }
 
-                        // Estado 3: Logueado y Conectado (Listo para usar)
+                        // Estado 3: Logueado y Conectado (DJ Activo)
                         else -> {
                             Column(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text("Status: ✅ Conectado", style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                Text("Track actual: ${state.spotifyState.currentTrack?.trackName ?: "Ninguno"}")
+                                // --- CHAT / MENSAJE DEL DJ ---
+                                DjMessageCard(text = state.djText)
+                                // --- FIN CHAT ---
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(24.dp))
 
-                                Button(onClick = { vm.processIntent(HomeViewModelIntent.AskAiForNextSong) }) {
-                                    Text("IA: Dame la próxima canción")
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text("Sugerencia IA: ${state.aiState.aiSong}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Razón: ${state.aiState.aiReason}", style = MaterialTheme.typography.bodySmall)
+                                Text("Track: ${state.spotifyState.currentTrack?.trackName ?: "Ninguno"} de ${state.spotifyState.currentTrack?.artistName ?: "Desconocido"}",
+                                    style = MaterialTheme.typography.bodyMedium)
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 Button(onClick = { vm.processIntent(HomeViewModelIntent.DjExplainSong) }) {
-                                    Text("DJ: Explicame la canción")
+                                    Text("🎤 DJ: Explicame la canción")
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Button(onClick = { vm.processIntent(HomeViewModelIntent.AskAiForNextSong) }) {
+                                    Text("🎧 IA: Dame la próxima canción")
                                 }
                             }
                         }
@@ -142,9 +140,39 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                 ) {
+                    // La corrección del bug de layout del player debe hacerse en SpotifyPlayerBar.kt
                     SpotifyPlayerBar(vm = vm)
                 }
             }
         }
     )
+}
+
+// 🎯 Nuevo Composable para simular un mensaje de chat
+@Composable
+fun DjMessageCard(text: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentHeight(),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Text(
+                text = "AI DJ dice:",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        }
+    }
 }

@@ -9,6 +9,9 @@ import com.spotify.android.appremote.api.SpotifyAppRemote
 import com.spotify.protocol.types.Track
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 
 class SpotifyManager(
@@ -16,10 +19,9 @@ class SpotifyManager(
 ) {
 
     private var spotifyAppRemote: SpotifyAppRemote? = null
-
-    var accessToken: String? = null
-
     var currentTrackCache: CurrentTrack? = null
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
     // -----------------------------------------------------------
     //  CONNECT
@@ -39,11 +41,13 @@ class SpotifyManager(
                 override fun onConnected(remote: SpotifyAppRemote) {
                     spotifyAppRemote = remote
                     Log.d("SpotifyManager", "Connected to Spotify App Remote")
+                    _isConnected.value = true
                     trySend(true)
                 }
 
                 override fun onFailure(error: Throwable) {
                     Log.e("SpotifyManager", "Connection failed: ${error.localizedMessage}")
+                    _isConnected.value = false // 🎯 ACTUALIZAR ESTADO
                     trySend(false)
                 }
             }
@@ -60,6 +64,7 @@ class SpotifyManager(
             SpotifyAppRemote.disconnect(it)
         }
         spotifyAppRemote = null
+        _isConnected.value = false // 🎯 ACTUALIZAR ESTADO
     }
 
     // -----------------------------------------------------------
