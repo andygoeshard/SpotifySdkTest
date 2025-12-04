@@ -1,8 +1,12 @@
 package com.andy.spotifysdktesting.feature.spotifysdk.data.repository
 
 import android.util.Log
+import com.andy.spotifysdktesting.feature.spotifysdk.data.entity.DetailedTrackInfo
+import com.andy.spotifysdktesting.feature.spotifysdk.data.entity.FullTrackResponse
 import com.andy.spotifysdktesting.feature.spotifysdk.data.entity.PagingObject
+import com.andy.spotifysdktesting.feature.spotifysdk.data.entity.RecommendationsResponse
 import com.andy.spotifysdktesting.feature.spotifysdk.data.entity.TrackRecommendation
+import com.andy.spotifysdktesting.feature.spotifysdk.domain.helper.extractIdFromUri
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyTokenManager
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.Track
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.repository.AuthRepository
@@ -15,6 +19,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val TAG = "SpotifyRepo"
+
+private val jsonParser = Json {
+    ignoreUnknownKeys = true
+}
 
 class SpotifyRepositoryImpl(
     private val api: SpotifyApiService,
@@ -64,7 +72,9 @@ class SpotifyRepositoryImpl(
         // ... (Tu implementación original) ...
         val root = JSONObject(json)
         val itemsArray: JSONArray = when {
-            rootKey != null && root.has(rootKey) -> root.getJSONObject(rootKey).getJSONArray("items")
+            rootKey != null && root.has(rootKey) -> root.getJSONObject(rootKey)
+                .getJSONArray("items")
+
             root.has("items") -> root.getJSONArray("items") // Usado por Top Tracks
             else -> return emptyList()
         }
@@ -114,81 +124,131 @@ class SpotifyRepositoryImpl(
     }
 
     override suspend fun getTopTracks(limit: Int): List<TrackRecommendation> {
-        return try {
-            val rawJson = api.getTopTracks(limit, "medium_term")
+        return safeApiCall {
+            try {
+                val rawJson = api.getTopTracks(limit, "medium_term")
+                Log.d(TAG, "RAW JSON Top Tracks: $rawJson")
+                val topTracksResponse = jsonParser.decodeFromString<PagingObject>(rawJson)
 
-            val topTracksResponse = Json.decodeFromString<PagingObject>(rawJson)
+                topTracksResponse.items.mapNotNull { item ->
+                    val trackName = item.name
+                    val artistName = item.artists.firstOrNull()?.name
+                    val uri = item.uri
 
-            topTracksResponse.items.mapNotNull { item ->
-                val trackName = item.name
-                val artistName = item.artists.firstOrNull()?.name
-                val uri = item.uri
-
-                if (trackName != null && artistName != null && uri != null) {
-                    TrackRecommendation(uri, trackName, artistName)
-                } else {
-                    null
+                    if (trackName != null && artistName != null && uri != null) {
+                        TrackRecommendation(uri, trackName, artistName)
+                    } else {
+                        null
+                    }
                 }
+            } catch (e: Exception) {
+                // Este catch ahora solo capturará fallos de red/Ktor o fallos de parsing (si son severos)
+                Log.e(TAG, "Error al obtener Top Tracks (después de safeApiCall): ${e.message}", e)
+                emptyList()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al obtener Top Tracks: ${e.message}", e)
-            emptyList()
         }
     }
 
     override suspend fun getRecentlyPlayed(limit: Int): List<TrackRecommendation> {
-        return try {
-            val rawJson = api.getRecentlyPlayed(limit)
+        return safeApiCall { // 💡 ENVOLVEMOS en safeApiCall
+            try {
+                val rawJson = api.getRecentlyPlayed(limit)
 
-            // La respuesta de Recently Played es un PagingObject que contiene un objeto 'track' (SimplifiedTrack)
-            val playedResponse = Json.decodeFromString<PagingObject>(rawJson)
+                // La respuesta de Recently Played es un PagingObject que contiene un objeto 'track' (SimplifiedTrack)
+                val playedResponse = jsonParser.decodeFromString<PagingObject>(rawJson)
 
-            playedResponse.items.mapNotNull { item ->
-                val simplifiedTrack = item.track
-                if (simplifiedTrack != null) {
-                    val artistName = simplifiedTrack.artists.firstOrNull()?.name
-                    if (artistName != null) {
-                        TrackRecommendation(simplifiedTrack.uri, simplifiedTrack.name, artistName)
+                playedResponse.items.mapNotNull { item ->
+                    val simplifiedTrack = item.track
+                    if (simplifiedTrack != null) {
+                        val artistName = simplifiedTrack.artists.firstOrNull()?.name
+                        if (artistName != null) {
+                            TrackRecommendation(
+                                simplifiedTrack.uri,
+                                simplifiedTrack.name,
+                                artistName
+                            )
+                        } else {
+                            null
+                        }
                     } else {
                         null
                     }
-                } else {
-                    null
                 }
+            } catch (e: Exception) {
+                Log.e(
+                    TAG,
+                    "Error al obtener Recently Played (después de safeApiCall): ${e.message}",
+                    e
+                )
+                emptyList()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al obtener Recently Played: ${e.message}", e)
-            emptyList()
         }
     }
 
-    // Mantenemos la función de Recomendaciones para el flujo de "seeding"
     override suspend fun getRecommendations(
         seedTracks: List<String>,
-        seedArtists: List<String>
+        seedArtists: List<String>,
+        seedGenres: List<String>
     ): List<TrackRecommendation> {
-        return try {
-            val rawJson = api.getRecommendations(seedTracks = seedTracks, seedArtists = seedArtists)
-            // Asumiendo que esta API también devuelve un formato parseable similar a Top/Played
-            // Nota: La API de Recommendations a menudo devuelve un objeto 'tracks': List<SimplifiedTrack>, no un PagingObject.
-            // Ajusta la deserialización si es necesario. Por simplicidad, asumiremos un parsing similar:
+        return safeApiCall {
+            try {
+                val rawJson = api.getRecommendations(
+                    seedTracks = seedTracks,
+                    seedArtists = seedArtists,
+                    seedGenres = seedGenres
+                )
+                Log.d(TAG, "Raw JSON recibido: $rawJson")
 
-            val recommendations = Json.decodeFromString<PagingObject>(rawJson)
+                val recommendations = jsonParser.decodeFromString<RecommendationsResponse>(rawJson)
 
-            recommendations.items.mapNotNull { item ->
-                // Lógica de mapeo basada en la estructura de respuesta de la API de Recommendations
-                val track = item.track ?: return@mapNotNull null // Usamos item.track si es un SimplifiedTrack
-                val artistName = track.artists.firstOrNull()?.name
-                if (artistName != null) {
-                    TrackRecommendation(track.uri, track.name, artistName)
-                } else {
-                    null
+                return@safeApiCall recommendations.tracks.mapNotNull { track ->
+                    val artist = track.artists.firstOrNull()?.name ?: return@mapNotNull null
+                    TrackRecommendation(
+                        uri = track.uri.orEmpty(),
+                        name = track.name.orEmpty(),
+                        artist = artist
+                    )
                 }
-            }
 
-        } catch (e: Exception) {
-            Log.e(TAG, "Error al obtener recomendaciones por Seed: ${e.message}", e)
-            emptyList()
+            } catch (e: Exception) {
+                Log.e(
+                    TAG,
+                    "Error al obtener recomendaciones por Seed (después de safeApiCall): ${e.message}",
+                    e
+                )
+                emptyList()
+            }
+        }
+    }
+
+    override suspend fun getDetailedTrackInfo(trackId: String): DetailedTrackInfo? {
+        return safeApiCall {
+            try {
+                val trackJsonRaw = api.getTrack(extractIdFromUri(trackId)?: "")
+                val fullTrackResponse = jsonParser.decodeFromString<FullTrackResponse>(trackJsonRaw)
+
+                val mainArtist = fullTrackResponse.artists.firstOrNull()
+                val artistId = mainArtist?.id
+
+                if (artistId.isNullOrBlank() || fullTrackResponse.id.isNullOrBlank()) {
+                    Log.w(TAG, "ID de Track o Artista faltante en getDetailedTrackInfo para ID: $trackId")
+                    return@safeApiCall null
+                }
+
+                return@safeApiCall DetailedTrackInfo(
+                    trackId = fullTrackResponse.id!!,
+                    artistId = artistId,
+                    artistName = mainArtist!!.name,
+                    durationMs = fullTrackResponse.durationMs ?: 0,
+                    previewUrl = fullTrackResponse.previewUrl,
+                    genres = emptyList()
+                )
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al obtener info detallada del track $trackId: ${e.message}", e)
+                null
+            }
         }
     }
 }
+

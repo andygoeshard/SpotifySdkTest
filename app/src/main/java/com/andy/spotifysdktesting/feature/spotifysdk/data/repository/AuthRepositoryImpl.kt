@@ -24,7 +24,7 @@ class AuthRepositoryImpl(
     private val pkce: PKCEManager,
     private val clientId: String,
     private val redirectUri: String,
-    private val client: HttpClient, // ⚠️ AQUÍ DEBE LLEGAR EL CLIENTE "AuthClient" (SIN TOKEN)
+    private val client: HttpClient,
     private val tokenManager: SpotifyTokenManager
 ) : AuthRepository {
 
@@ -40,7 +40,7 @@ class AuthRepositoryImpl(
                 "&redirect_uri=$redirectUri" +
                 "&code_challenge=$challenge" +
                 "&code_challenge_method=S256" +
-                "&scope=user-read-private%20user-read-email%20streaming%20user-read-playback-state%20user-modify-playback-state"
+                "&scope=user-read-private%20user-read-email%20streaming%20user-read-playback-state%20user-modify-playback-state%20user-top-read%20user-read-recently-played"
     }
 
     override suspend fun exchangeCodeForToken(code: String): Boolean = withContext(Dispatchers.IO) {
@@ -92,10 +92,6 @@ class AuthRepositoryImpl(
         }
 
         val response = client.post("https://accounts.spotify.com/api/token") {
-            // 🛑 ELIMINAR: Ya no necesitamos contentType() aquí si usamos FormDataContent
-            // contentType(ContentType.Application.FormUrlEncoded)
-
-            // 🎯 CLAVE: Usar FormDataContent para envolver los parámetros
             setBody(FormDataContent(form))
         }
 

@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -44,7 +47,6 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // ... (LaunchedEffect para AuthURL y Eventos se mantienen igual)
     LaunchedEffect(state.authState.authUrl) {
         if (state.authState.authUrl.isNotEmpty()) {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.authState.authUrl))
@@ -98,7 +100,6 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                             }
                         }
 
-                        // Estado 3: Logueado y Conectado (DJ Activo)
                         else -> {
                             Column(
                                 modifier = Modifier
@@ -106,15 +107,19 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                                     .padding(horizontal = 16.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
+                                // ----------------------------------------------------
+                                // 🚨 CAMBIO MAYOR: LazyColumn para el Historial de Chat
+                                ChatHistory(messages = state.messageHistory)
+                                Spacer(modifier = Modifier.height(24.dp))
+                                // ----------------------------------------------------
+
+                                // El resto de los elementos los ponemos abajo
                                 Text("Status: ✅ Conectado", style = MaterialTheme.typography.titleMedium)
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                // --- CHAT / MENSAJE DEL DJ ---
-                                DjMessageCard(text = state.djText)
-                                // --- FIN CHAT ---
+                                // ... (El resto de la info del track y botones se mantienen igual) ...
 
-                                Spacer(modifier = Modifier.height(24.dp))
-
+                                // Esto lo movemos para que los botones queden abajo del chat
                                 Text("Track: ${state.spotifyState.currentTrack?.trackName ?: "Ninguno"} de ${state.spotifyState.currentTrack?.artistName ?: "Desconocido"}",
                                     style = MaterialTheme.typography.bodyMedium)
 
@@ -134,13 +139,11 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                     }
                 }
 
-                // 2. Componente de Spotify (BottomBar)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                 ) {
-                    // La corrección del bug de layout del player debe hacerse en SpotifyPlayerBar.kt
                     SpotifyPlayerBar(vm = vm)
                 }
             }
@@ -148,7 +151,21 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
     )
 }
 
-// 🎯 Nuevo Composable para simular un mensaje de chat
+@Composable
+fun ChatHistory(messages: List<String>) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 300.dp)
+            .padding(vertical = 8.dp),
+        reverseLayout = true,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom) // Espacio entre mensajes
+    ) {
+        items(messages.reversed()) { message -> // Iteramos sobre la lista
+            DjMessageCard(text = message)
+        }
+    }
+}
 @Composable
 fun DjMessageCard(text: String) {
     Card(

@@ -82,11 +82,12 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
         // 1. Imagen y Texto
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f) // 🎯 CRÍTICO: La Row principal del contenido toma el peso
+            modifier = Modifier.weight(1f)
         ) {
-            AsyncImage(
-                model = trackInfo.imageUri,
-                contentDescription = "Track Image",
+            // 🚨 CAMBIO: Usamos el nuevo Composable del disco giratorio
+            VinylDiscImage(
+                imageUri = trackInfo.imageUri,
+                isPaused = isPaused,
                 modifier = Modifier.size(40.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -154,6 +155,74 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun VinylDiscImage(imageUri: String?, isPaused: Boolean, modifier: Modifier = Modifier) {
+    // Velocidad de rotación: 3 segundos por vuelta (rápido y visible)
+    val rotationDuration = 3000
+
+    // Animación de rotación continua
+    val rotation = remember { Animatable(0f) }
+
+    // Animación de frenado / inicio
+    val brakeFactor = remember { Animatable(1f) } // Factor de velocidad: 1f = velocidad normal
+
+    LaunchedEffect(isPaused) {
+        if (!isPaused) {
+            // Estado: PLAY
+            brakeFactor.stop() // Detener cualquier animación de frenado
+            brakeFactor.snapTo(1f) // Asegurar velocidad normal
+            rotation.animateTo(
+                targetValue = rotation.value + 360f, // Solo un ciclo, pero se repite
+                animationSpec = infiniteRepeatable(
+                    animation = tween(rotationDuration, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        } else {
+            // Estado: PAUSE
+            rotation.stop() // Detener la rotación infinita
+
+            // Animación de desaceleración (Frenado)
+            brakeFactor.animateTo(
+                targetValue = 0f, // Llevar la velocidad a 0
+                animationSpec = tween(
+                    durationMillis = 800, // Duración del frenado
+                    easing = LinearOutSlowInEasing // Desaceleración suave
+                )
+            )
+        }
+    }
+
+    val appliedRotation = rotation.value * brakeFactor.value
+
+    Box(
+        modifier = modifier
+            .size(40.dp) // Mismo tamaño que antes
+            .clip(CircleShape)
+            .rotate(appliedRotation)
+            .background(Color.Black), // Fondo negro para simular el vinilo
+        contentAlignment = Alignment.Center
+    ) {
+        // Imagen del Album (el disco)
+        AsyncImage(
+            model = imageUri,
+            contentDescription = "Track Image",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize(0.85f) // Disco un poco más pequeño para dejar el borde negro
+                .clip(CircleShape)
+        )
+
+        // Círculo Central (el agujero)
+        Box(
+            modifier = Modifier
+                .size(8.dp) // Pequeño círculo central
+                .clip(CircleShape)
+                .background(Color.White) // Círculo central blanco
+        )
     }
 }
 

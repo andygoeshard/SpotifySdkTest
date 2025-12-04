@@ -5,7 +5,7 @@ import com.google.ai.client.generativeai.GenerativeModel
 
 class GeminiClientImpl(apiKey: String) : AiClient {
     private val client = GenerativeModel(
-        modelName = "gemini-2.5-flash", // Mejor modelo para JSON y velocidad
+        modelName = "gemini-2.5-flash",
         apiKey = apiKey
     )
 

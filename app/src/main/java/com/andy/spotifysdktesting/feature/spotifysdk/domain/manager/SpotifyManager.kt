@@ -88,7 +88,8 @@ class SpotifyManager(
                     trackName = track?.name ?: "",
                     artistName = track?.artist?.name ?: "",
                     imageUri = track?.imageUri?.raw,
-                    isPaused = playerState.isPaused
+                    isPaused = playerState.isPaused,
+                    id = track?.uri
                 )
 
                 currentTrackCache = ct

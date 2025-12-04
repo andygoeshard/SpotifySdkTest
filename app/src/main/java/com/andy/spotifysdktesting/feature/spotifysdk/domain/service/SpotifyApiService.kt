@@ -1,10 +1,10 @@
 package com.andy.spotifysdktesting.feature.spotifysdk.domain.service
 
-import androidx.media3.common.util.Log
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
+import android.util.Log
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 
 class SpotifyApiService(
@@ -23,7 +23,6 @@ class SpotifyApiService(
     }
 
     suspend fun getTrack(id: String): String {
-        // Asumiendo que esta es la llamada correcta
         return client.get("https://api.spotify.com/v1/tracks/$id").body()
     }
 
@@ -32,22 +31,33 @@ class SpotifyApiService(
     }
 
     suspend fun getRecommendations(
-        seedTracks: List<String> = emptyList(),
-        seedArtists: List<String> = emptyList(),
-        seedGenres: List<String> = emptyList()
+        seedTracks: List<String>,
+        seedArtists: List<String>,
+        seedGenres: List<String>
     ): String {
-        return client.get("https://api.spotify.com/v1/recommendations") {
-            if (seedTracks.isNotEmpty())
+        val response = client.get("https://api.spotify.com/v1/recommendations") {
+
+            if (seedTracks.isNotEmpty()) {
                 parameter("seed_tracks", seedTracks.joinToString(","))
+            }
 
-            if (seedArtists.isNotEmpty())
+            if (seedArtists.isNotEmpty()) {
                 parameter("seed_artists", seedArtists.joinToString(","))
+            }
 
-            if (seedGenres.isNotEmpty())
+            if (seedGenres.isNotEmpty()) {
                 parameter("seed_genres", seedGenres.joinToString(","))
+            }
 
-            parameter("limit", 20)
-        }.body()
+            parameter("limit", 10)
+        }
+
+        val body = response.bodyAsText()
+
+        Log.e("KtorDebug", "👉 STATUS: ${response.status.value}")
+        Log.e("KtorDebug", "👉 BODY RAW: $body")
+
+        return body
     }
 
     suspend fun getTopTracks(limit: Int, timeRange: String): String {

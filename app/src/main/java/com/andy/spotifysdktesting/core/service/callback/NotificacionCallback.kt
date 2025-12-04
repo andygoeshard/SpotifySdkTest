@@ -37,7 +37,7 @@ class DjNextCallback : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         Log.d("GlanceCallback", "DJ Next tocado.")
         val intent = Intent(context, DjService::class.java).apply {
-            action = DjService.ACTION_NEXT_TOP_TRACK_IA
+            action = DjService.ACTION_NEXT_TRACK_IA
         }
         context.startService(intent)
     }

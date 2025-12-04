@@ -1,5 +1,6 @@
 package com.andy.spotifysdktesting.core.navigation.presentation.viewmodel
 
+import android.R
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -16,6 +17,7 @@ import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthVie
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyState
 import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -29,6 +31,7 @@ data class HomeViewState(
     val djState: TtsState,
     val authState: SpotifyAuthState,
     val djText: String,
+    val messageHistory: List<String>
 )
 
 sealed class HomeViewModelIntent {
@@ -56,7 +59,7 @@ class HomeViewModel(
     private val tts: TtsViewModel,
     private val auth: SpotifyAuthViewModel,
     private val context: Context,
-    private val djStateManager: DjStateManager // 🎯 INYECCIÓN
+    private val djStateManager: DjStateManager
 ) : ViewModel() {
 
     private val _event = Channel<HomeEvent>(Channel.BUFFERED)
@@ -67,15 +70,34 @@ class HomeViewModel(
         observeLoginStatus()
     }
 
-    val state: StateFlow<HomeViewState> = combine(
-        spotify.spotifyState,
-        ai.uiState,
-        tts.state,
-        auth.uiState,
-        djStateManager.currentDjText // 🎯 COMBINAR EL ESTADO DEL DJ
-    ) { spotify, ai, tts, auth, djText ->
-        HomeViewState(spotify, ai, tts, auth, djText)
+    val state: StateFlow<HomeViewState> = kotlinx.coroutines.flow.combine(
+        listOf(
+            spotify.spotifyState,
+            ai.uiState,
+            tts.state,
+            auth.uiState,
+            djStateManager.currentDjText,
+            djStateManager.messageHistory
+        ) as List<Flow<Any>>
+    ) { results ->
+
+        // El resto del mapeo por índice se mantiene igual
+        @Suppress("UNCHECKED_CAST")
+        val spotify = results[0] as SpotifyState
+        @Suppress("UNCHECKED_CAST")
+        val ai = results[1] as AiState
+        @Suppress("UNCHECKED_CAST")
+        val tts = results[2] as TtsState
+        @Suppress("UNCHECKED_CAST")
+        val auth = results[3] as SpotifyAuthState
+        @Suppress("UNCHECKED_CAST")
+        val djText = results[4] as String
+        @Suppress("UNCHECKED_CAST")
+        val history = results[5] as List<String>
+
+        HomeViewState(spotify, ai, tts, auth, djText, history)
     }.stateIn(
+        // ... (initialValue se mantiene igual) ...
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = HomeViewState(
@@ -83,7 +105,8 @@ class HomeViewModel(
             ai.uiState.value,
             tts.state.value,
             auth.uiState.value,
-            djStateManager.currentDjText.value // 🎯 VALOR INICIAL
+            djStateManager.currentDjText.value,
+            djStateManager.messageHistory.value
         )
     )
 
