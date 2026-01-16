@@ -1,16 +1,16 @@
 package com.andy.spotifysdktesting.feature.spotifysdk.di
 
 import com.andy.spotifysdktesting.BuildConfig
-import com.andy.spotifysdktesting.feature.spotifysdk.data.repository.AuthRepositoryImpl
-import com.andy.spotifysdktesting.feature.spotifysdk.data.repository.SpotifyRepositoryImpl
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.PKCEManager
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.repository.SpotifyRepository
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.service.SpotifyApiService
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyManager
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifyTokenManager
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.repository.AuthRepository
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthViewModel
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
+import com.andy.spotifysdktesting.feature.spotifywebapi.data.repository.AuthRepositoryImpl
+import com.andy.spotifysdktesting.feature.spotifywebapi.data.repository.SpotifyRepositoryImpl
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.PKCEManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.repository.SpotifyRepository
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.service.SpotifyApiService
+import com.andy.spotifysdktesting.feature.spotifysdk.domain.manager.SpotifySdkManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.SpotifyAuthManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.SpotifyTokenManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.SpotifyWebManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.repository.AuthRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.auth.Auth
@@ -19,15 +19,15 @@ import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val spotifyModule = module {
-    single { SpotifyManager(get()) }
+    single { SpotifySdkManager(get()) }
+    single { SpotifyWebManager(get(), get()) }
+    single { SpotifyAuthManager(get(), get()) }
+
     single { SpotifyTokenManager(get()) }
-    viewModel { SpotifyViewModel(get(), get()) }
-    viewModel { SpotifyAuthViewModel(get()) }
 
     single { PKCEManager() }
     single(named("ApiClient")) {
@@ -35,7 +35,6 @@ val spotifyModule = module {
         val authRepo: AuthRepository = get()
 
         HttpClient {
-            // 1. Configuración Base (Igual que en koinModule)
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
@@ -82,7 +81,6 @@ val spotifyModule = module {
         }
     }
 
-    // 🎯 INYECCIONES
     single {
         SpotifyApiService(
             client = get(named("ApiClient")), // Usa el cliente con Token

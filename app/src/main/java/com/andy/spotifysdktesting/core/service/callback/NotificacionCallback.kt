@@ -10,7 +10,6 @@ import com.andy.spotifysdktesting.core.service.DjService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 private val callbackScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

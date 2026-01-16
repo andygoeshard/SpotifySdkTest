@@ -1,0 +1,121 @@
+package com.andy.spotifysdktesting.feature.spotifywebapi.data.repository
+
+import android.content.Context
+import com.andy.spotifysdktesting.feature.spotifywebapi.data.dto.TokenResponse
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.PKCEManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.manager.SpotifyTokenManager
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.repository.AuthRepository
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.http.Parameters
+import io.ktor.http.isSuccess
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+class AuthRepositoryImpl(
+    private val context: Context,
+    private val pkce: PKCEManager,
+    private val clientId: String,
+    private val redirectUri: String,
+    private val client: HttpClient,
+    private val tokenManager: SpotifyTokenManager
+) : AuthRepository {
+
+    override suspend fun startLogin(): String {
+        val verifier = pkce.generateCodeVerifier()
+        val challenge = pkce.generateCodeChallenge(verifier)
+
+        tokenManager.saveVerifier(verifier)
+
+        return "https://accounts.spotify.com/authorize?" +
+                "client_id=$clientId" +
+                "&response_type=code" +
+                "&redirect_uri=$redirectUri" +
+                "&code_challenge=$challenge" +
+                "&code_challenge_method=S256" +
+                "&scope=user-read-private%20user-read-email%20streaming%20user-read-playback-state%20user-modify-playback-state%20user-top-read%20user-read-recently-played"
+    }
+
+    override suspend fun exchangeCodeForToken(code: String): Boolean = withContext(Dispatchers.IO) {
+        val verifier = tokenManager.getVerifier()
+
+        if (verifier.isNullOrEmpty()) {
+            println("ERROR: Verifier no encontrado.")
+            return@withContext false
+        }
+
+        val form = Parameters.Companion.build {
+            append("client_id", clientId)
+            append("grant_type", "authorization_code")
+            append("code", code)
+            append("redirect_uri", redirectUri)
+            append("code_verifier", verifier)
+        }
+
+        // ⚠️ Asegúrate de que esta URL sea la correcta de Spotify Accounts
+        val response: HttpResponse = client.post("https://accounts.spotify.com/api/token") {
+            setBody(FormDataContent(form))
+        }
+
+        if (!response.status.isSuccess()) {
+            println("ERROR en exchangeCodeForToken: ${response.status}")
+            return@withContext false
+        }
+
+        val body: TokenResponse = response.body()
+
+        tokenManager.saveTokens(
+            accessToken = body.accessToken,
+            refreshToken = body.refreshToken,
+            expiresInSeconds = body.expiresIn
+        )
+
+        tokenManager.clearVerifier()
+        return@withContext true
+    }
+
+    override suspend fun refreshToken(): Boolean = withContext(Dispatchers.IO) {
+        val refresh = tokenManager.getRefreshToken() ?: return@withContext false
+
+        // ✅ ESTE ES EL OBJETO DE PARÁMETROS DE FORMULARIO
+        val form = Parameters.Companion.build {
+            append("grant_type", "refresh_token")
+            append("refresh_token", refresh)
+            append("client_id", clientId)
+        }
+
+        val response = client.post("https://accounts.spotify.com/api/token") {
+            setBody(FormDataContent(form))
+        }
+
+        if (!response.status.isSuccess()) {
+            println("ERROR en refreshToken: ${response.status}")
+            return@withContext false
+        }
+
+        val body: TokenResponse = response.body()
+
+        tokenManager.saveTokens(
+            accessToken = body.accessToken,
+            refreshToken = body.refreshToken ?: refresh,
+            expiresInSeconds = body.expiresIn
+        )
+
+        return@withContext true
+    }
+
+    override suspend fun getCurrentAccessToken(): String? {
+        return tokenManager.getAccessToken()
+    }
+
+    override suspend fun clearTokens() = withContext(Dispatchers.IO) {
+        tokenManager.clear()
+        println("Tokens de Spotify limpiados del DataStore.")
+    }
+
+
+}

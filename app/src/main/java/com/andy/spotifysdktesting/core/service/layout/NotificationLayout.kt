@@ -2,10 +2,7 @@ package com.andy.spotifysdktesting.core.service.layout
 
 import android.content.Context
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -52,7 +49,6 @@ class DjNotificationLayout: GlanceAppWidget() {
                 .cornerRadius(16.dp),
             verticalAlignment = Alignment.Vertical.CenterVertically
         ) {
-            // Placeholder/Icono del DJ
             Image(
                 provider = ImageProvider(R.drawable.ic_launcher_foreground), // Usa un icono relevante aquí
                 contentDescription = "DJ Icon",
@@ -61,33 +57,25 @@ class DjNotificationLayout: GlanceAppWidget() {
 
             Spacer(modifier = GlanceModifier.width(8.dp))
 
-            // Zona de Texto (Placeholder de la Notificación)
             Column(
                 modifier = GlanceModifier.defaultWeight()
             ) {
                 Text(
-                    text = "AI DJ ACTIVO",
-                    style = androidx.glance.text.TextStyle(color = colors.primary)                )
-                Text(
-                    text = "Toca para Controles...",
-                    style = androidx.glance.text.TextStyle(color = colors.secondary)
-                )
+                    text = "Radio :)",
+                    style = androidx.glance.text.TextStyle(color = colors.primary))
             }
 
-            // Controles
             Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
-                // Botón DJ Next Song
                 Image(
-                    provider = ImageProvider(R.drawable.baseline_music_note_24), // Recurso de icono
+                    provider = ImageProvider(R.drawable.baseline_music_note_24),
                     contentDescription = "DJ Next",
                     modifier = GlanceModifier.size(32.dp).clickable(actionRunCallback<DjNextCallback>())
                 )
 
                 Spacer(modifier = GlanceModifier.width(8.dp))
 
-                // Botón Skip Next
                 Image(
-                    provider = ImageProvider(R.drawable.baseline_skip_next_24), // Recurso de icono
+                    provider = ImageProvider(R.drawable.baseline_skip_next_24),
                     contentDescription = "Next Song",
                     modifier = GlanceModifier.size(32.dp).clickable(actionRunCallback<SkipNextCallback>())
                 )

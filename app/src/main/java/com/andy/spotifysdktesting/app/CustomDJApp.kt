@@ -3,6 +3,7 @@ package com.andy.spotifysdktesting.app
 import android.app.Application
 import com.andy.spotifysdktesting.core.ai.di.aiModule
 import com.andy.spotifysdktesting.core.di.koinModule
+import com.andy.spotifysdktesting.core.dj.di.djModule
 import com.andy.spotifysdktesting.core.navigation.di.navigationModule
 import com.andy.spotifysdktesting.core.tts.di.ttsModule
 import com.andy.spotifysdktesting.feature.spotifysdk.di.spotifyModule
@@ -26,7 +27,8 @@ class CustomDJApp: Application() {
                 ttsModule,
                 aiModule,
                 spotifyModule,
-                navigationModule
+                navigationModule,
+                djModule
             )
         }
     }

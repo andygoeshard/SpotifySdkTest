@@ -1,24 +1,33 @@
 package com.andy.spotifysdktesting.core.ai.di
 
 import com.andy.spotifysdktesting.BuildConfig
-import com.andy.spotifysdktesting.core.ai.data.provider.GeminiClientImpl
-import com.andy.spotifysdktesting.core.ai.data.provider.GroqClientImpl
-import com.andy.spotifysdktesting.core.ai.domain.AiClient
-import com.andy.spotifysdktesting.core.ai.domain.AiMusicBrain
-import com.andy.spotifysdktesting.core.ai.presentation.viewmodel.AiViewModel
-import org.koin.core.module.dsl.viewModel
+import com.andy.spotifysdktesting.core.ai.data.repository.DeepSeekClientImpl
+import com.andy.spotifysdktesting.core.ai.data.repository.GeminiClientImpl
+import com.andy.spotifysdktesting.core.ai.data.repository.GroqClientImpl
+import com.andy.spotifysdktesting.core.ai.domain.repository.AiClient
+import com.andy.spotifysdktesting.core.ai.domain.manager.AiManager
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val aiModule = module {
-    single {
+    single(named("gemini")) {
+        GeminiClientImpl(BuildConfig.GEMINI_API_KEY)
+    }
+
+    single(named("groq")) {
         GroqClientImpl(
             apiKey = BuildConfig.GROQ_API_KEY,
             httpClient = get(named("AuthClient"))
         )
     }
-    single { GeminiClientImpl(BuildConfig.GEMINI_API_KEY) }
-    single<AiClient> { get<GeminiClientImpl>() }
-    single { AiMusicBrain(aiClient = get()) }
-    viewModel { AiViewModel(get(),get(),get(),get()) }
+
+    single(named("deepseek")) {
+        DeepSeekClientImpl(
+            apiKey = BuildConfig.DEEPSEEK_API_KEY,
+            httpClient = get(named("AuthClient"))
+        )
+    }
+
+    single<AiClient> { get(named("gemini")) }
+    single { AiManager(aiClient = get()) }
 }

@@ -1,0 +1,16 @@
+package com.andy.spotifysdktesting.core.ai.data.repository
+
+import com.andy.spotifysdktesting.core.ai.domain.repository.AiClient
+import com.google.ai.client.generativeai.GenerativeModel
+
+class GeminiClientImpl(apiKey: String) : AiClient {
+    private val client = GenerativeModel(
+        modelName = "gemini-2.5-flash",
+        apiKey = apiKey
+    )
+
+    override suspend fun generateContent(prompt: String): String {
+        val response = client.generateContent(prompt)
+        return response.text ?: ""
+    }
+}

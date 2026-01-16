@@ -53,24 +53,21 @@ import com.andy.spotifysdktesting.R
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModel
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModelIntent
 import com.andy.spotifysdktesting.feature.spotifysdk.domain.model.CurrentTrack
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthState
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
 
     val state by vm.state.collectAsState()
-    val spotifyState = state.spotifyState
+    val spotifyState = state.dj
     val trackInfo = spotifyState.currentTrack
 
-    if (!spotifyState.isConnected || trackInfo == null) {
+    if (!spotifyState.isSdkConnected || trackInfo == null) {
         return
     }
 
     val isPaused = trackInfo.isPaused
 
-    // La barra de control en la parte inferior
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -119,9 +116,7 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Botón Skip Previous
-            // ... (botones se mantienen igual)
-            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnPreviousSong) }) {
+            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnPreviousTrack) }) {
                 Icon(
                     painter = painterResource(id = R.drawable.baseline_skip_previous_24),
                     contentDescription = "Previous",
@@ -147,7 +142,7 @@ fun SpotifyPlayerBar(vm: HomeViewModel = koinViewModel()) {
             }
 
             // Botón Skip Next
-            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnNextSong) }) {
+            IconButton(onClick = { vm.processIntent(HomeViewModelIntent.OnNextTrack) }) {
                 Icon(
                     painter = painterResource(id = R.drawable.baseline_skip_next_24),
                     contentDescription = "Next",

@@ -6,6 +6,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import io.ktor.client.HttpClientConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -33,11 +36,14 @@ val koinModule = module {
         expectSuccess = false
     }
 
-    // 🎯 1. CLIENTE PARA AUTENTICACIÓN (AuthClient)
-    // Solo aplica la configuración común. NO tiene Auth plugin.
     single(named("AuthClient")) {
         HttpClient {
             commonConfig() // ✅ Aplicamos la config aquí
         }
     }
+
+    single<CoroutineScope> {
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    }
+
 }

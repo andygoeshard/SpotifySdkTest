@@ -25,7 +25,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -47,9 +46,9 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.authState.authUrl) {
-        if (state.authState.authUrl.isNotEmpty()) {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.authState.authUrl))
+    LaunchedEffect(state.dj.authUrl) {
+        if (state.dj.authUrl.isNotEmpty()) {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(state.dj.authUrl))
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(intent)
         }
@@ -82,7 +81,7 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                 ) {
                     when {
                         // Estado 1: Deslogueado
-                        !state.authState.isLoggedIn -> {
+                        !state.dj.isLoggedIn -> {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("Spotify requiere tu atención.", style = MaterialTheme.typography.titleLarge)
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -93,7 +92,7 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                         }
 
                         // Estado 2: Conectando SDK
-                        !state.spotifyState.isConnected -> {
+                        !state.dj.isSdkConnected -> {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("🔌 Conectando a Spotify SDK...")
                                 Text("Asegúrate de tener la app de Spotify abierta.")
@@ -109,7 +108,7 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                             ) {
                                 // ----------------------------------------------------
                                 // 🚨 CAMBIO MAYOR: LazyColumn para el Historial de Chat
-                                ChatHistory(messages = state.messageHistory)
+                                ChatHistory(messages = state.dj.messageHistory)
                                 Spacer(modifier = Modifier.height(24.dp))
                                 // ----------------------------------------------------
 
@@ -120,18 +119,18 @@ fun HomeScreen(vm: HomeViewModel = koinViewModel()) {
                                 // ... (El resto de la info del track y botones se mantienen igual) ...
 
                                 // Esto lo movemos para que los botones queden abajo del chat
-                                Text("Track: ${state.spotifyState.currentTrack?.trackName ?: "Ninguno"} de ${state.spotifyState.currentTrack?.artistName ?: "Desconocido"}",
+                                Text("Track: ${state.dj.currentTrack?.trackName ?: "Ninguno"} de ${state.dj.currentTrack?.artistName ?: "Desconocido"}",
                                     style = MaterialTheme.typography.bodyMedium)
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                Button(onClick = { vm.processIntent(HomeViewModelIntent.DjExplainSong) }) {
+                                Button(onClick = { vm.processIntent(HomeViewModelIntent.ExplainCurrentSong) }) {
                                     Text("🎤 DJ: Explicame la canción")
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Button(onClick = { vm.processIntent(HomeViewModelIntent.AskAiForNextSong) }) {
+                                Button(onClick = { vm.processIntent(HomeViewModelIntent.NextTrackIA) }) {
                                     Text("🎧 IA: Dame la próxima canción")
                                 }
                             }

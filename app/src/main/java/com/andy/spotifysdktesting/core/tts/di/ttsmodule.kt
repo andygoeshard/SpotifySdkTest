@@ -2,14 +2,13 @@ package com.andy.spotifysdktesting.core.tts.di
 
 import androidx.media3.exoplayer.ExoPlayer
 import com.andy.spotifysdktesting.BuildConfig
-import com.andy.spotifysdktesting.core.tts.data.AndroidTtsEngine
-import com.andy.spotifysdktesting.core.tts.data.ElevenLabsEngine
-import com.andy.spotifysdktesting.core.tts.domain.TtsEngine
-import com.andy.spotifysdktesting.core.tts.domain.TtsManager
+import com.andy.spotifysdktesting.core.tts.data.engine.AndroidTtsEngine
+import com.andy.spotifysdktesting.core.tts.data.engine.ElevenLabsEngine
+import com.andy.spotifysdktesting.core.tts.domain.engine.TtsEngine
+import com.andy.spotifysdktesting.core.tts.domain.manager.TtsManager
+import com.andy.spotifysdktesting.core.tts.domain.manager.TtsPlaybackManager
 import com.andy.spotifysdktesting.core.tts.playback.AudioPlayer
-import com.andy.spotifysdktesting.core.tts.presentation.viewmodel.TtsViewModel
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModel
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
@@ -41,9 +40,12 @@ val ttsModule = module {
         androidContext(),
         exoPlayer = get()
     ) }
-    viewModel { TtsViewModel(
-        get(),
-        audioPlayer = get()
-    ) }
 
+    single {
+        TtsPlaybackManager(
+            tts = get(),
+            audioPlayer = get(),
+            scope = get()
+        )
+    }
 }

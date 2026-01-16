@@ -124,6 +124,8 @@ dependencies {
     implementation(libs.datastore.core)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+    implementation(libs.play.services.location)
+    implementation(libs.cronet.embedded)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

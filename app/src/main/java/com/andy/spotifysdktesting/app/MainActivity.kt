@@ -5,31 +5,22 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import com.andy.spotifysdktesting.app.ui.theme.SpotifySdkTestingTheme
 import com.andy.spotifysdktesting.core.navigation.presentation.screen.MainScaffold
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModel
 import com.andy.spotifysdktesting.core.navigation.presentation.viewmodel.HomeViewModelIntent
-import com.andy.spotifysdktesting.feature.spotifysdk.domain.handler.SpotifyAuthDeeplinkHandler
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.RedirectActivity
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyAuthViewModel
-import com.andy.spotifysdktesting.feature.spotifysdk.ui.viewmodel.SpotifyViewModel
-import org.koin.androidx.viewmodel.ext.android.getViewModel
-import org.koin.androidx.viewmodel.ext.android.viewModel
-import org.koin.compose.viewmodel.koinViewModel
+import com.andy.spotifysdktesting.feature.spotifywebapi.domain.handler.SpotifyAuthDeeplinkHandler
 import org.koin.java.KoinJavaComponent.getKoin
 
 class MainActivity : ComponentActivity() {
 
     private val home: HomeViewModel by lazy {
-        getKoin().get<HomeViewModel>() // Obtener la instancia singleton o única
+        getKoin().get<HomeViewModel>()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Manejar caso donde la app estaba cerrada y se abre por el link
         handleIntentIfDeeplink(intent)
 
         setContent {
@@ -39,7 +30,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Este método se llama cuando la app ya estaba abierta y el navegador vuelve a ella
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntentIfDeeplink(intent)
